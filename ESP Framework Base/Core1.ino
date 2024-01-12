@@ -3,10 +3,9 @@
 // Utilizing ESP Timer library to allow for 
 // Written by: Jordan Kooyman
 
-#include "esp_timer.h"
-
 // Global Variables:
 bool timer0Flag = false;
+struct timeval tv;
 
 
 // Sensor Timer Configurations
@@ -20,7 +19,10 @@ const esp_timer_create_args_t Sensor0Config = {.callback = &Sensor0_Callback, .n
 
 void core1Setup()
 {
+  // Setup GPS Module
   attachInterrupt(GPS_PPS_Pin, GPS_PPS_ISR, RISING);
+
+  //GPSSerial.begin(GPSBaudRate);
   
   // ESP Timer Configurations
   // https://docs.espressif.com/projects/esp-idf/en/latest/esp32/api-reference/system/esp_timer.html
@@ -31,6 +33,10 @@ void core1Setup()
 
 void core1Loop()
 {
+  // Update Stored System Time
+  gettimeofday(&tv, nullptr);
+
+  // Non-time-critical Sensor Polling handling
   if (timer0Flag)
   {
     timer0Flag = false;
