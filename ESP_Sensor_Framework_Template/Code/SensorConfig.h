@@ -18,24 +18,34 @@
 // High-rate Sensors
 /*****************************************************************************/
 // FastSensorExample
+  // bool FastSensorExample_Run = true;
   // esp_timer_handle_t FastSensorExample_Timer;
   // #define FastSensorExample_RunsPerSecond 100
   // #define FastSensorExample_Pin 4
   // #define FastSensorExample_Name "Fast Sensor Example"
   // const esp_timer_create_args_t FastSensorExample_Config = {.callback = &FastSensorExample_Callback, .name = FastSensorExample_Name, .skip_unhandled_events = SkipUnhandledInterruptsFast}; 
 
-// Gyro
+// ISM330DHCX Accelerometer
   Adafruit_ISM330DHCX ism330dhcx;
-  esp_timer_handle_t Gyro_Timer;
-  #define Gyro_RunsPerSecond 100
-  #define Gyro_Name "Onboard Gyro/Accelerometer"
-  const esp_timer_create_args_t Gyro_Config = {.callback = &Gyro_Callback, .name = Gyro_Name, .skip_unhandled_events = SkipUnhandledInterruptsFast};
+  bool ISM330DHCX_Run = true;
+  esp_timer_handle_t ISM330DHCX_Timer;
+  #define ISM330DHCX_RunsPerSecond 10
+  #define ISM330DHCX_Name "Onboard Gyro/Accelerometer"
+  const esp_timer_create_args_t ISM330DHCX_Config = {.callback = &ISM330DHCX_Callback, .name = ISM330DHCX_Name, .skip_unhandled_events = SkipUnhandledInterruptsFast};
 
 
 // Low-rate Sensors
 /*****************************************************************************/
 // SlowSensorExample
+  // bool SlowSensorExample_Run = true;
   // unsigned long long SlowSensorExample_Time = 0;
   // #define SlowSensorExample_SecondsPerRun 5
   // #define SlowSensorExample_Pin 3
   // #define SlowSensorExample_Name "Slow Sensor Example"
+
+// WiFi Strength (RSSI)
+  bool RSSI_Run = true;
+  unsigned long long RSSI_Time = 0;
+  #define RSSI_SecondsPerRun 2
+  #define RSSI_Pin 3
+  #define RSSI_Name "RSSI"

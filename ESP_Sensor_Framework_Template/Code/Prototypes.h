@@ -4,29 +4,26 @@
 
 // ESP_GPS_Timers_Config_Example_Reference.ino
 void setup();
-void loop(); // Unused, but required
-void core0OS(void * pvParameters);
-void core1OS(void * pvParameters);
+void loop();
 
 // SensorsFast.cpp
+void startHighRateSensors();
 // static void FastSensorExample_Callback(void* args);
-static void Gyro_Callback(void* args);
+static void ISM330DHCX_Callback(void* args);
 
 // SensorsSlow.cpp
+void startLowRateSensors();
 // void SlowSensorExample_Poll();
+void RSSI_Poll();
 
 // Functions.cpp
 void setInfluxConfig();
-void setWifiConfig();
+void setWifiConfig(int Network = 1);
+void setWifiMultiConfig();
+bool tryTimeSync();
+int32_t getGPSTime();
+int setUnixtime(int32_t unixtime);
 void IRAM_ATTR GPS_PPS_ISR();
 unsigned long long getTime();
 unsigned long long getSeconds();
 void setIsm330Config();
-
-// Core0.cpp
-void core0Setup();
-void core0Loop();
-
-// Core1.cpp
-void core1Setup();
-void core1Loop();
