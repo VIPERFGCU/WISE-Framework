@@ -72,7 +72,6 @@ bool writeError = false;
 int slowPointCount = 0;
 int fastPointCount = 0;
 int fastPointCountAlt = 0;
-bool nodeRedState = false;
 struct timeval tv;
 TaskHandle_t Task1;
 TaskHandle_t Task2;

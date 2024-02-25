@@ -419,13 +419,23 @@ void onConnectionEstablished()
     {
       ISM330DHCX_Run = false;
       RSSI_Run = false;
+      transmitInfluxBuffer();
+      slowPointCount = 0;
+      fastPointCount = 0;
+      fastPointCountAlt = 0;
+
+      #ifdef SerialDebugMode
       Serial.println("Recording stopped");
+      #endif
     }
       else if (payload == NODE_RED_START)
     {
       ISM330DHCX_Run = true;
       RSSI_Run = true;
+
+      #ifdef SerialDebugMode
       Serial.println("Recording started");
+      #endif
     }
   }, 0);
   Serial.println("Connected to MQTT broker.");
