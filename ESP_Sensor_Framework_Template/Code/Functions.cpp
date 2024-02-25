@@ -5,6 +5,7 @@
 #ifndef FunctionsCode
 #define FunctionsCode
 
+#include "Configuration.h"
 void setInfluxConfig() {
     // Enable batching and timestamp precision
     client.setWriteOptions(WriteOptions().writePrecision(WritePrecision::US).batchSize(BATCH_SIZE));
@@ -387,5 +388,47 @@ void setIsm330Config() {
     ism330dhcx.configInt2(false, true, false); // gyro DRDY on INT2
 }
 
+void setMqttConfig()
+{
+  Serial.print("Connecting to: ");
+  Serial.print(MQTT_SERVER);
+  Serial.print(":");
+  Serial.println(MQTT_PORT);
+  Serial.print("Topic: ");
+  Serial.println(MQTT_TOPIC_PUBLISH);
+}
+
+void onConnectionEstablished()
+{
+  mqttClient.enableDebuggingMessages();
+  mqttClient.enableLastWillMessage(MQTT_TOPIC_SUBCRIBE, "Device disconnected.");
+  mqttClient.publish(MQTT_TOPIC_SUBCRIBE, "Device connected.", 0);
+  mqttClient.subscribe(MQTT_TOPIC_PUBLISH, [](const String & payload)
+  {
+    Serial.print("Message arrived on topic: ");
+    Serial.print(MQTT_TOPIC_PUBLISH);
+    Serial.print(". Message: ");
+    Serial.println(payload);
+
+    if (payload == NODE_RED_RESET)
+    {
+      Serial.println("Resetting device");
+      ESP.restart();
+    }
+    else if (payload == NODE_RED_STOP)
+    {
+      ISM330DHCX_Run = false;
+      RSSI_Run = false;
+      Serial.println("Recording stopped");
+    }
+      else if (payload == NODE_RED_START)
+    {
+      ISM330DHCX_Run = true;
+      RSSI_Run = true;
+      Serial.println("Recording started");
+    }
+  }, 0);
+  Serial.println("Connected to MQTT broker.");
+}
 
 #endif // FunctionsCode

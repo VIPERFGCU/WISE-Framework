@@ -27,3 +27,5 @@ void IRAM_ATTR GPS_PPS_ISR();
 unsigned long long getTime();
 unsigned long long getSeconds();
 void setIsm330Config();
+void setMqttConfig();
+void onConnectionEstablished();

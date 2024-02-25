@@ -41,6 +41,17 @@
 // InfluxDB v2 bucket name (Use: InfluxDB UI ->  Data -> Buckets)
 #define INFLUXDB_BUCKET "test" // Update This! <-----------------------------------------------------------------------------
 
+// MQTT Server information
+#define MQTT_SERVER "69.88.163.33"
+#define MQTT_PORT 1883
+#define MQTT_SUBCRIBE_TOPIC "topic/fromNR"
+#define MQTT_PUBLISH_TOPIC "topic/toNR"
+
+// NODE-RED Commands
+#define NODE_RED_START "start"
+#define NODE_RED_STOP "stop"
+#define NODE_RED_RESTART "reset"
+
 // Transmission Batching Controls
 #define BATCH_SIZE 100
 #define StartTransmissionPercentage 60
@@ -61,10 +72,15 @@ bool writeError = false;
 int slowPointCount = 0;
 int fastPointCount = 0;
 int fastPointCountAlt = 0;
+bool nodeRedState = false;
 struct timeval tv;
 TaskHandle_t Task1;
 TaskHandle_t Task2;
 TinyGPSPlus gps;
 WiFiMulti wifiMulti;
+EspMQTTClient mqttClient(
+        MQTT_SERVER,
+        MQTT_PORT,
+        DEVICE);
 
 #endif // ConfigCode
