@@ -14,7 +14,7 @@
 
 
 // Device
-#define DEVICE "ESP32" // Update This! <-------------------------------------------------------------------------------------
+#define DEVICE "ESP32-J2" // Update This! <-------------------------------------------------------------------------------------
 #define GPS_PPS_PIN 27 // Pulse-Per-Second Pin used for GPS Time Synchronization (Check)
 #define PPSOffsetMicroseconds 0
 #define GPSSerial Serial1
@@ -39,7 +39,7 @@
 // InfluxDB v2 organization id (Use: InfluxDB UI -> User -> About -> Common Ids )
 #define INFLUXDB_ORG "867116c343b9f084" // Update This! <--------------------------------------------------------------------
 // InfluxDB v2 bucket name (Use: InfluxDB UI ->  Data -> Buckets)
-#define INFLUXDB_BUCKET "test" // Update This! <-----------------------------------------------------------------------------
+#define INFLUXDB_BUCKET "OutdoorESP1" // Update This! <-----------------------------------------------------------------------------
 
 // Transmission Batching Controls
 #define BATCH_SIZE 100
@@ -58,6 +58,7 @@ InfluxDBClient client(INFLUXDB_URL, INFLUXDB_ORG, INFLUXDB_BUCKET, INFLUXDB_TOKE
 Point* fast_datapoints[BATCH_SIZE];
 SemaphoreHandle_t InfluxClientMutex = NULL;
 bool writeError = false;
+bool GPSSync = false;
 int slowPointCount = 0;
 int fastPointCount = 0;
 int fastPointCountAlt = 0;

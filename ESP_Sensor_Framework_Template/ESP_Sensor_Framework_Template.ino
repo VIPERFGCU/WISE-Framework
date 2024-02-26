@@ -61,7 +61,7 @@ void setup()
   InfluxClientMutex = xSemaphoreCreateMutex();
 
   // Setup GPS Module PPS Time Sync
-  pinMode(GPS_PPS_PIN, INPUT); // Need a pull-down mode (not available in Arduino but is in ESP-IDF)
+  pinMode(GPS_PPS_PIN, INPUT_PULLDOWN); // Need a pull-down mode (not available in Arduino but is in ESP-IDF)
   attachInterrupt(digitalPinToInterrupt(GPS_PPS_PIN), GPS_PPS_ISR, RISING);
 }
 
@@ -85,6 +85,13 @@ void loop()
     Serial.println(digitalRead(GPS_PPS_PIN));
   #endif
 
+
+  // GPS Time Resync
+  if (GPSSync)
+  {
+    GPSSync = false;
+    settimeofday(&tv, nullptr);
+  }
   
 
   // Update Stored System Time for GPS Interrupt Usage
