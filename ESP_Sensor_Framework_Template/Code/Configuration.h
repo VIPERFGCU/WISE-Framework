@@ -10,22 +10,31 @@
 // #define SerialDebugMode
 // #define TransmitDetailDebugging
 // #define HighRateDetailDebugging
+// #define InterruptDebugging
 #define SerialBaudRate 115200
+// #define OLEDDebugging
+#define HasNeopixel
+
+// Data Logging Modes
+// #define InfluxLogging
+#define SDLogging
 
 
 // Device
-#define DEVICE "ESP32-J2" // Update This! <-------------------------------------------------------------------------------------
-#define GPS_PPS_PIN 27 // Pulse-Per-Second Pin used for GPS Time Synchronization (Check)
+#define DEVICE "ESP32-X" // Update This! <-------------------------------------------------------------------------------------
+#define GPS_PPS_PIN 27 // Pulse-Per-Second Pin used for GPS Time Synchronization
+#define PPSOffsetSeconds 0
 #define PPSOffsetMicroseconds 0
 #define GPSSerial Serial1
 #define GPSBaudRate 115200
 
 // WiFi Network(s) for Setup/Initialization - Any additions or subtractions made here also need to be made to setWifiConfig() in Functions.cpp
+#define WIFICONNECTTIME 30 // How many seconds to wait while attempting to connect to a network before moving on
 #define I_WIFI_SSID "fgcu-campus" // Update This! <--------------------------------------------------------------------------
 #define I_WIFI_PASSWORD "" // Update This! <---------------------------------------------------------------------------------
 #define I_WIFI_SSID2 "" // Alternate network for time sync only // Update This! <--------------------------------------------
 #define I_WIFI_PASSWORD2 "" // Update This! <--------------------------------------------------------------------------------
-#define I_WIFI_ATTEMPT_COUNT_LIMIT 2
+#define I_WIFI_ATTEMPT_COUNT_LIMIT 3
 // WiFi Network(s) for Operation - Any additions or subtractions made here also need to be made to setWifiMultiConfig() in Functions.cpp
 #define O_WIFI_SSID I_WIFI_SSID
 #define O_WIFI_PASSWORD I_WIFI_PASSWORD
@@ -42,7 +51,7 @@
 #define INFLUXDB_BUCKET "OutdoorESP1" // Update This! <-----------------------------------------------------------------------------
 
 // Transmission Batching Controls
-#define BATCH_SIZE 100
+#define BATCH_SIZE 150
 #define StartTransmissionPercentage 60
 #define HighRateMutexWaitTicks 10
 
@@ -51,21 +60,48 @@
 #define ntpServer "pool.ntp.org"
 #define ntpServer2 "time.nis.gov"
 
+// SD Card (Adalogger)
+#define STR_HELPER(x) #x
+#define STR(x) STR_HELPER(x)
+#define CONCAT(a, b) a "/" b
+#define FILENAME(device) (CONCAT(STR(device), "_Log.txt"))
+
 
 // Global Variables:
 /*****************************************************************************/
+#ifdef HasNeopixel
+Adafruit_NeoPixel pixel(1, PIN_NEOPIXEL, NEO_GRB + NEO_KHZ800);
+#endif
+#ifdef InfluxLogging
 InfluxDBClient client(INFLUXDB_URL, INFLUXDB_ORG, INFLUXDB_BUCKET, INFLUXDB_TOKEN);
 Point* fast_datapoints[BATCH_SIZE];
 SemaphoreHandle_t InfluxClientMutex = NULL;
+#endif
+#ifdef SDLogging
+fs::File dataLog;
+#endif
+#ifdef OLEDDebugging
+Adafruit_SH1107 display = Adafruit_SH1107(64, 128, &Wire);
+#endif
 bool writeError = false;
 bool GPSSync = false;
 int slowPointCount = 0;
 int fastPointCount = 0;
 int fastPointCountAlt = 0;
-struct timeval tv;
+// struct timeval tv;
+unsigned long GPS_us;
 TaskHandle_t Task1;
 TaskHandle_t Task2;
 TinyGPSPlus gps;
 WiFiMulti wifiMulti;
+
+
+
+
+
+// Configuration Sanity Checks
+#if !defined(InfluxLogging) && !defined(SDLogging)
+#error No Data Logging Selected
+#endif
 
 #endif // ConfigCode

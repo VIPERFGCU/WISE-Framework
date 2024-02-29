@@ -17,13 +17,27 @@ void startLowRateSensors();
 void RSSI_Poll();
 
 // Functions.cpp
+#ifdef InfluxLogging
 void setInfluxConfig();
-void setWifiConfig(int Network = 1);
+#endif
+bool setWifiConfig(int Network = 1);
 void setWifiMultiConfig();
-bool tryTimeSync();
+bool tryTimeSync(bool WiFi_Connected);
+bool checkGPSTime();
 int32_t getGPSTime();
 int setUnixtime(int32_t unixtime);
-void IRAM_ATTR GPS_PPS_ISR();
+void ARDUINO_ISR_ATTR GPS_PPS_ISR();
 unsigned long long getTime();
 unsigned long long getSeconds();
+unsigned long long getuSeconds();
+#ifdef InfluxLogging
+void transmitInfluxBuffer();
+#endif
+#ifdef SDLogging
+void logDataPoint(unsigned long long uS, unsigned long long S, String Sensor, String Value, bool final);
+void logDataPoint(unsigned long long uS, unsigned long long S, String Sensor, float Value, bool final);
+void logDataPoint(unsigned long long uS, unsigned long long S, String Sensor, double Value, bool final);
+void logDataPoint(unsigned long long uS, unsigned long long S, String Sensor, int Value, bool final);
+void logDataPoint(unsigned long long uS, unsigned long long S, String Sensor, long Value, bool final);
+#endif
 void setIsm330Config();

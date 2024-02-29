@@ -5,33 +5,66 @@
 #ifndef FunctionsCode
 #define FunctionsCode
 
+#ifdef InfluxLogging
 void setInfluxConfig() {
     // Enable batching and timestamp precision
     client.setWriteOptions(WriteOptions().writePrecision(WritePrecision::US).batchSize(BATCH_SIZE));
 }
+#endif
 
 
-void setWifiConfig(int Network) {
-    WiFi.mode(WIFI_STA);
-    if (Network == 1)
-      WiFi.begin(I_WIFI_SSID, I_WIFI_PASSWORD);
-    else if (Network == 2)
-      WiFi.begin(I_WIFI_SSID2, I_WIFI_PASSWORD2);
+bool setWifiConfig(int Network) {
+  WiFi.mode(WIFI_STA);
+  if (Network == 1)
+    WiFi.begin(I_WIFI_SSID, I_WIFI_PASSWORD);
+  else if (Network == 2)
+    WiFi.begin(I_WIFI_SSID2, I_WIFI_PASSWORD2);
 
+  #ifdef SerialDebugMode
+  Serial.print("Connecting to wifi");
+  Serial.print(WiFi.SSID());
+  #endif
+  #ifdef OLEDDebugging
+  display.print("Connecting to wifi");
+  display.print(WiFi.SSID());
+  display.display();
+  #endif
+
+  int cycles = 0;
+  while (WiFi.status() != WL_CONNECTED && cycles < (2*WIFICONNECTTIME)) {
+      #ifdef SerialDebugMode
+      Serial.print(".");
+      #endif
+      #ifdef OLEDDebugging
+      display.print(".");
+      display.display();
+      #endif
+      delay(500);
+      cycles++;
+  }
+  if (cycles >= (2*WIFICONNECTTIME))
+  {
     #ifdef SerialDebugMode
-    Serial.print("Connecting to wifi");
-    Serial.print(WiFi.SSID());
-    #endif
-    while (WiFi.status() != WL_CONNECTED) {
-        #ifdef SerialDebugMode
-        Serial.print(".");
-        #endif
-        delay(500);
-    }
-    #ifdef SerialDebugMode
-    Serial.print("Connected to wifi");
+    Serial.print("Not Connected to wifi");
     Serial.println(WiFi.SSID());
     #endif
+    #ifdef OLEDDebugging
+    display.print("Not Connected to wifi");
+    display.println(WiFi.SSID());
+    display.display();
+    #endif
+    return false;
+  }
+  #ifdef SerialDebugMode
+  Serial.print("Connected to wifi");
+  Serial.println(WiFi.SSID());
+  #endif
+  #ifdef OLEDDebugging
+  display.print("Connected to wifi");
+  display.println(WiFi.SSID());
+  display.display();
+  #endif
+  return true;
 }
 
 
@@ -45,54 +78,114 @@ void setWifiMultiConfig()
   // wifiMulti.addAP(O_WIFI_SSID2, O_WIFI_PASSWORD2);
 
   #ifdef SerialDebugMode
-    Serial.print("Connecting to wifi");
-    Serial.print(WiFi.SSID());
-    #endif
-    while (wifiMulti.run() != WL_CONNECTED) {
-        #ifdef SerialDebugMode
-        Serial.print(".");
-        #endif
-        delay(500);
-    }
+  Serial.print("Connecting to wifi");
+  Serial.print(WiFi.SSID());
+  #endif
+  #ifdef OLEDDebugging
+  display.print("Connecting to wifi");
+  display.print(WiFi.SSID());
+  display.display();
+  #endif
+  while (wifiMulti.run() != WL_CONNECTED) {
     #ifdef SerialDebugMode
-    Serial.print("Connected to wifi");
-    Serial.println(WiFi.SSID());
+    Serial.print(".");
     #endif
+    #ifdef OLEDDebugging
+    display.print(".");
+    display.display();
+    #endif
+    delay(500);
+  }
+  #ifdef SerialDebugMode
+  Serial.print("Connected to wifi");
+  Serial.println(WiFi.SSID());
+  #endif
+  #ifdef OLEDDebugging
+  display.print("Connected to wifi");
+  display.println(WiFi.SSID());
+  display.display();
+  #endif
+  #ifdef HasNeopixel
+  pixel.setPixelColor(0, pixel.Color(150, 75, 75));
+  pixel.show();
+  #endif
 }
 
 
 void setTime()
 {
-  bool useGPSTime;
-  if (!tryTimeSync()) // Attempt NTP Time Sync on primary network
-  {
-    WiFi.disconnect(true, true);
-    delay(250);
-    setWifiConfig(2); // Use alternate network to get time from
-    useGPSTime = !tryTimeSync();
-  }
+  #ifdef HasNeopixel
+  pixel.setPixelColor(0, pixel.Color(255, 0, 255));
+  pixel.show();
+  #endif
+  setenv("TZ", TimeZoneOffset,1);
 
+  bool useGPSTime = true;
+
+  if(!checkGPSTime())
+  {
+    // Network 1
+    #ifdef HasNeopixel
+    pixel.setPixelColor(0, pixel.Color(0, 0, 125));
+    pixel.show();
+    #endif
+    // Connect to WiFi for Initial Setup (Wait until Connected)
+    bool connected = setWifiConfig();
+
+    if (!tryTimeSync(connected)) // Attempt NTP Time Sync on primary network
+    {
+      // Network 2
+      #ifdef HasNeopixel
+      pixel.setPixelColor(0, pixel.Color(0, 125, 125));
+      pixel.show();
+      #endif
+      WiFi.disconnect(true, true);
+      delay(250);
+      connected = setWifiConfig(2); // Use alternate network to get time from
+      useGPSTime = !tryTimeSync(connected);
+    }
+    else
+      useGPSTime = false; // First time sync attempt worked
+  }
   if(useGPSTime)
   {
+    #ifdef HasNeopixel
+    pixel.setPixelColor(0, pixel.Color(255, 255, 255));
+    pixel.show();
+    #endif
     #ifdef SerialDebugMode
     Serial.println("Using GPS Time");
+    #endif
+    #ifdef OLEDDebugging
+    display.println("Using GPS Time");
+    display.display();
     #endif
     setUnixtime(getGPSTime());
   }
 
-  gettimeofday(&tv, nullptr);
+  // Time Sync completed
+  #ifdef HasNeopixel
+  pixel.setPixelColor(0, pixel.Color(255, 255, 0));
+  pixel.show();
+  #endif
 }
 
 
-// Returns False if attempts ran out, True if time successfully synchronized
-bool tryTimeSync()
+// Returns False if attempts ran out or otherwise failed, True if time successfully synchronized
+bool tryTimeSync(bool WiFi_Connected)
 {
+  if (!WiFi_Connected)
+    return false;
   int attemptCount = 1;
-
+  struct timeval tv;
   // Update Stored System Time
   gettimeofday(&tv, nullptr);
   #ifdef SerialDebugMode
   Serial.print("Time: "); Serial.println(getSeconds());
+  #endif
+  #ifdef OLEDDebugging
+  display.print("Time: "); display.println(getSeconds());
+  display.display();
   #endif
 
   while(getSeconds() < 1000)
@@ -100,7 +193,11 @@ bool tryTimeSync()
     #ifdef SerialDebugMode
     Serial.print("Attempt "); Serial.println(attemptCount);
     #endif
-    timeSync(TimeZoneOffset, ntpServer, ntpServer2);
+    #ifdef OLEDDebugging
+    display.print("Attempt "); display.println(attemptCount);
+    display.display();
+    #endif
+    timeSync(TimeZoneOffset, ntpServer, ntpServer2); // Influx Client Function
     // Update Stored System Time
     gettimeofday(&tv, nullptr);
     attemptCount++;
@@ -111,25 +208,59 @@ bool tryTimeSync()
 }
 
 
-int32_t getGPSTime()
-{ // From https://github.com/espressif/arduino-esp32/issues/1444
-  time_t t_of_day; 
-  struct tm t;   
-  while (GPSSerial.available()) {
-    gps.encode(char(GPSSerial.read()));
-    if (gps.date.isUpdated())
-    {
-      t.tm_year = gps.date.year()-1900;
-      t.tm_mon = gps.date.month()-1;           // Month, 0 - jan
-      t.tm_mday = gps.date.day();          // Day of the month
-      t.tm_hour = gps.time.hour();
-      t.tm_min =  gps.time.minute();
-      t.tm_sec = gps.time.second();
-      t_of_day = mktime(&t);
-  
-      return t_of_day;
+bool checkGPSTime() {
+  // Wait until GPS data is available or timeout (1 second)
+  unsigned long start = millis();
+  while (GPSSerial.available() < 10 && millis() - start < 1000) {
+    delay(100);
+  }
+
+  // If there is new data, parse it
+  if (GPSSerial.available() > 0) {
+    while (GPSSerial.available()) {
+      gps.encode(GPSSerial.read());
+    }
+    // Check if GPS has valid time
+    if (gps.time.isValid()) {
+      return true; // GPS has current time
     }
   }
+
+  // No valid time found
+  return false;
+}
+
+
+int32_t getGPSTime()
+{
+  // Ensure GPS data is available
+  if (!GPSSerial.available()) {
+    return 0; // Return 0 if no data available
+  }
+
+  // Create a variable to hold GPS time
+  int32_t gpsTime = 0;
+
+  // Parse GPS data
+  while (GPSSerial.available()) {
+    gps.encode(GPSSerial.read());
+    if (gps.date.isValid() && gps.time.isValid()) {
+      // Create a tm struct to hold time components
+      struct tm t;
+      t.tm_year = gps.date.year() - 1900;
+      t.tm_mon = gps.date.month() - 1;
+      t.tm_mday = gps.date.day();
+      t.tm_hour = gps.time.hour();
+      t.tm_min = gps.time.minute();
+      t.tm_sec = gps.time.second();
+
+      // Convert tm struct to epoch time
+      gpsTime = mktime(&t);
+      break; // Exit loop once time is obtained
+    }
+  }
+
+  return gpsTime;
 }
 
 
@@ -150,18 +281,20 @@ void ARDUINO_ISR_ATTR GPS_PPS_ISR()
   // look at current time and compare to last interrupt time, then
   // (just?) get current time, round it to the nearest 100 microseconds, then set it again
   // or zero current microseconds and set seconds to last globally stored value (+1?)
-  tv.tv_usec = PPSOffsetMicroseconds;
-  #ifndef NTPDelayHigh
-  tv.tv_sec++; // This may skew the time by 1 second, depending on NTP accuracy
-  #endif
-  // settimeofday(&tv, nullptr);
+  // tv.tv_usec = PPSOffsetMicroseconds;
+  // #ifndef NTPDelayHigh
+  // tv.tv_sec++; // This may skew the time by 1 second, depending on NTP accuracy
+  // #endif
+  // // settimeofday(&tv, nullptr);
+  GPS_us = micros();
   GPSSync = true;
 
   #ifdef SerialDebugMode
+  #ifdef InterruptDebugging
   Serial.println(); Serial.println(); Serial.println(); Serial.println();
-  Serial.print("GPS PPS Reset - ");
-  Serial.println(tv.tv_sec);
+  Serial.print("GPS PPS Reset");
   Serial.println(); Serial.println();
+  #endif
   #endif
 }
 
@@ -175,6 +308,10 @@ unsigned long long getTime() { // unsigned long long type to match the type used
     #ifdef SerialDebugMode
     Serial.println("Failed to obtain time");
     #endif
+    #ifdef OLEDDebugging
+    display.println("Failed to obtain time");
+    display.display();
+    #endif
     return(0);
   }
   time(&now);
@@ -185,11 +322,23 @@ unsigned long long getTime() { // unsigned long long type to match the type used
 // Get Seconds since Epoch
 unsigned long long getSeconds()
 {
+  struct timeval tv;
+  gettimeofday(&tv, nullptr);
   return tv.tv_sec;
 }
 
 
+// Get Microseconds
+unsigned long long getuSeconds()
+{
+  struct timeval tv;
+  gettimeofday(&tv, nullptr);
+  return tv.tv_usec;
+}
+
+
 // Transmit Buffer
+#ifdef InfluxLogging
 void transmitInfluxBuffer()
 {
   #if defined(SerialDebugMode) && defined(TransmitDetailDebugging)
@@ -246,9 +395,80 @@ void transmitInfluxBuffer()
     Serial.println("Emptied Buffer, Done");
   #endif
 }
+#endif
 
 
-void setIsm330Config() {
+#ifdef SDLogging
+// void logDataPoint(unsigned long long uS, unsigned long long S, String Sensor, String Value, bool final)
+// {
+//   if (dataLog)
+//     dataLog = SD.open(FILENAME(DEVICE), FILE_WRITE);
+
+//   // #ifdef SerialDebugMode
+//   // Serial.print("Data Logging - ");
+//   // Serial.println(dataLog);
+//   // #endif
+
+//   dataLog.print("Time: "); dataLog.print(S);
+//   dataLog.print(" "); dataLog.print(uS); dataLog.print(" - ");
+//   dataLog.print(Sensor); dataLog.print(": "); dataLog.println(Value);
+
+//   if(final)
+//   {
+//     dataLog.flush();
+//     dataLog.close();
+//   }
+// }
+
+void logDataPoint(unsigned long long uS, unsigned long long S, String Sensor, String Value, bool final = false)
+{
+  // Open the file if it's not already open
+  if (!dataLog)
+    dataLog = SD.open(FILENAME(DEVICE), FILE_APPEND);
+
+  if (dataLog) {
+    String data = "Time: " + String(S) + "S " + String(uS) + "uS - " + Sensor + Value;
+    dataLog.println(data);
+
+    #ifdef SerialDebugMode
+    Serial.println("Data written successfully");
+    #endif
+
+    // If this is the final data point, flush and close the file
+    if (final) {
+      dataLog.flush();
+      dataLog.close();
+    }
+  } else {
+    #ifdef SerialDebugMode
+    Serial.println("Error opening file for logging data point.");
+    #endif
+  }
+}
+
+void logDataPoint(unsigned long long uS, unsigned long long S, String Sensor, float Value, bool final = false) {
+  char buffer[20]; // Adjust buffer size as needed
+  dtostrf(Value, 12, 6, buffer); // Adjust precision as needed (currently 6 decimal places)
+  logDataPoint(uS, S, Sensor, String(buffer), final);
+}
+
+void logDataPoint(unsigned long long uS, unsigned long long S, String Sensor, double Value, bool final = false) {
+  char buffer[20]; // Adjust buffer size as needed
+  dtostrf(Value, 12, 6, buffer); // Adjust precision as needed (currently 6 decimal places)
+  logDataPoint(uS, S, Sensor, String(buffer), final);
+}
+
+void logDataPoint(unsigned long long uS, unsigned long long S, String Sensor, int Value, bool final = false) {
+  logDataPoint(uS, S, Sensor, String(Value), final);
+}
+
+void logDataPoint(unsigned long long uS, unsigned long long S, String Sensor, long Value, bool final = false) {
+  logDataPoint(uS, S, Sensor, String(Value), final);
+}
+#endif
+
+
+void setIsm330Config() { // From Arduino Example
     // check for ism330dhcx
     if (!ism330dhcx.begin_I2C()) {
         #ifdef SerialDebugMode
