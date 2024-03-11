@@ -206,5 +206,8 @@ void loop()
 
   // Check if any low-rate sensors should be polled again (no interrupts called)
   checkLowRateSensors();
+
+  // Call the loop function to keep the connection alive
+  mqttClient.loop();
 }
 

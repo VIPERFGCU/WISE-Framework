@@ -29,6 +29,7 @@ int setUnixtime(int32_t unixtime);
 void ARDUINO_ISR_ATTR GPS_PPS_ISR();
 unsigned long long getTime();
 unsigned long long getSeconds();
+
 unsigned long long getuSeconds();
 #ifdef InfluxLogging
 void transmitInfluxBuffer();
@@ -41,3 +42,5 @@ void logDataPoint(unsigned long long uS, unsigned long long S, String Sensor, in
 void logDataPoint(unsigned long long uS, unsigned long long S, String Sensor, long Value, bool final);
 #endif
 void setIsm330Config();
+void setMqttConfig();
+void onConnectionEstablished();
