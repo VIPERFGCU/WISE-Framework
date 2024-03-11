@@ -30,17 +30,31 @@ void checkLowRateSensors()
   // void SlowSensorExample_Poll()
   // {
   //   // Create local datapoint
+  //   #ifdef InfluxLogging
   //   Point datapoint(SlowSensorExample_Name);
   //   datapoint.addTag("device", DEVICE);
 
-  //   // Attatch Timestamp to Data
-  //   datapoint.setTime(WritePrecision::S);
+    // // Attatch Timestamp to Data
+    // datapoint.setTime(WritePrecision::S);
+    // #endif
+    // #ifdef SDLogging
+    // unsigned long long timestampS = getSeconds();
+    // unsigned long long timestampuS = getuSeconds();
+    // #endif
 
   //   // Poll and Process Sensor Data
-  //   datapoint.addField("Example Slow Value", digitalRead(SlowSensorExample_Pin));
+  //   int data = digitalRead(SlowSensorExample_Pin)
+  //   #ifdef InfluxLogging
+  //   datapoint.addField("Example Slow Value", data);
+  //   #endif
 
-  //   // Send Point to Transmission Buffer
-  //   writeError = writeError || client.writePoint(datapoint);
+    // // Send Point to Transmission Buffer
+    // #ifdef InfluxLogging
+    // writeError = writeError || client.writePoint(datapoint);
+    // #endif
+    // #ifdef SDLogging
+    // logDataPoint(timestampuS, timestampS, "Example Slow Value", data);
+    // #endif
 
   //   slowPointCount++;
   //   SlowSensorExample_Time = getSeconds() + SlowSensorExample_SecondsPerRun;
@@ -50,17 +64,33 @@ void checkLowRateSensors()
   void RSSI_Poll()
   {
     // Create local datapoint
+    #ifdef InfluxLogging
     Point datapoint(RSSI_Name);
     datapoint.addTag("device", DEVICE);
 
     // Attatch Timestamp to Data
     datapoint.setTime(WritePrecision::S);
-
+    #endif
+    #ifdef SDLogging
+    unsigned long long timestampS = getSeconds();
+    unsigned long long timestampuS = getuSeconds();
+    #endif
     // Report RSSI of currently connected network
-    datapoint.addField("rssi", WiFi.RSSI());
+    int RSSI = WiFi.RSSI();
+
+
+    #ifdef InfluxLogging
+    datapoint.addField("rssi", RSSI);
+    #endif
+
+    #ifdef SDLogging
+    logDataPoint(timestampuS, timestampS, "RSSI", RSSI);
+    #endif
 
     // Send Point to Transmission Buffer
+    #ifdef InfluxLogging
     writeError = writeError || client.writePoint(datapoint);
+    #endif
 
     slowPointCount++;
     RSSI_Time = getSeconds() + RSSI_SecondsPerRun;

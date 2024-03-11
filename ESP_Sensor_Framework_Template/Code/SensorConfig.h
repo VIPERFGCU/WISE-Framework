@@ -29,7 +29,7 @@
   Adafruit_ISM330DHCX ism330dhcx;
   bool ISM330DHCX_Run = true;
   esp_timer_handle_t ISM330DHCX_Timer;
-  #define ISM330DHCX_RunsPerSecond 10
+  #define ISM330DHCX_RunsPerSecond 100
   #define ISM330DHCX_Name "Onboard Gyro/Accelerometer"
   const esp_timer_create_args_t ISM330DHCX_Config = {.callback = &ISM330DHCX_Callback, .name = ISM330DHCX_Name, .skip_unhandled_events = SkipUnhandledInterruptsFast};
 

@@ -1,0 +1,12 @@
+[Unit]
+Description=Grafana docker service
+Requires=docker.service
+After=docker.service
+
+[Service]
+Restart=always
+ExecStart=/usr/bin/docker start -a grafana-server
+ExecStop=/usr/bin/docker stop -t 5 grafana-server
+
+[Install]
+WantedBy=default.target

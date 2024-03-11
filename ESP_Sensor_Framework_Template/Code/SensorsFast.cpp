@@ -26,22 +26,38 @@ void startHighRateSensors()
     //   if(!FastSensorExample_Run) // Remote disable last-ditch check
     //     return;
     //
+    //   #ifdef InfluxLogging
     //   // Create local datapoint
     //   Point datapoint(FastSensorExample_Name);
     //   datapoint.addTag("device", DEVICE);
 
     //   // Attatch Timestamp to Data
     //   datapoint.setTime(WritePrecision::US);
+    //   #endif
+
+      // #ifdef SDLogging
+      // unsigned long long timestampuS = getuSeconds();
+      // unsigned long long timestampS = getSeconds();
+      // #endif
+
 
     //   // Poll & Process Sensor Data
-    //   datapoint.addField("Example Fast Value", digitalRead(FastSensorExample_Pin));
+    //   int data = digitalRead(FastSensorExample_Pin)
+    //   #ifdef digitalRead(FastSensorExample_Pin)
+    //   datapoint.addField("Example Fast Value", data);
+    //   #endif
+
+      // #ifdef SDLogging
+      // logDataPoint(timestampuS, timestampS, "Example Fast Value", data, true);
+      // #endif
 
       // #if defined(SerialDebugMode) && defined(HighRateDetailDebugging)
       //   Serial.println("Highrate before store");
       // #endif
 
-      // // Store Data
+      // // Store Influx Data
       // // Try to take the mutex but don't wait for long
+      // #ifdef InfluxLogging
       // if(xSemaphoreTake(InfluxClientMutex, ( TickType_t ) HighRateMutexWaitTicks) == pdTRUE) 
       // { // Send Point to Transmission Buffer
       //   #if defined(SerialDebugMode) && defined(HighRateDetailDebugging)
@@ -69,6 +85,7 @@ void startHighRateSensors()
       //     Serial.println("Highrate during alt store");
       //   #endif
       // } // mutex take
+      // #endif
 
       // #if defined(SerialDebugMode) && defined(HighRateDetailDebugging)
       //   Serial.println("Highrate Return Mutex");
@@ -82,12 +99,19 @@ void startHighRateSensors()
       if (!ISM330DHCX_Run) // Remote disable last-ditch check
         return;
 
+      #ifdef InfluxLogging
       // Create local datapoint
       Point datapoint(ISM330DHCX_Name);
       datapoint.addTag("device", DEVICE);
 
       // Attatch Timestamp to Data
       datapoint.setTime(WritePrecision::US);
+      #endif
+
+      #ifdef SDLogging
+      unsigned long long timestampuS = getuSeconds();
+      unsigned long long timestampS = getSeconds();
+      #endif
 
       // Poll Sensor Data
       sensors_event_t accel;
@@ -96,19 +120,31 @@ void startHighRateSensors()
 
       ism330dhcx.getEvent(&accel, &gyro, &temp);
 
+      #ifdef InfluxLogging
       datapoint.addField("Gyro X", gyro.gyro.x);
       datapoint.addField("Gyro Y", gyro.gyro.y);
       datapoint.addField("Gyro Z", gyro.gyro.z);
       datapoint.addField("Accel X", accel.acceleration.x);
       datapoint.addField("Accel Y", accel.acceleration.y);
       datapoint.addField("Accel Z", accel.acceleration.z);
+      #endif
+      
+      #ifdef SDLogging
+      logDataPoint(timestampuS, timestampS, "Gyro X", gyro.gyro.x);
+      logDataPoint(timestampuS, timestampS, "Gyro Y", gyro.gyro.y);
+      logDataPoint(timestampuS, timestampS, "Gyro Z", gyro.gyro.z);
+      logDataPoint(timestampuS, timestampS, "Accel X", accel.acceleration.x);
+      logDataPoint(timestampuS, timestampS, "Accel Y", accel.acceleration.y);
+      logDataPoint(timestampuS, timestampS, "Accel Z", accel.acceleration.z, true);
+      #endif
 
       #if defined(SerialDebugMode) && defined(HighRateDetailDebugging)
         Serial.println("Highrate before store");
       #endif
 
-      // Store Data
+      // Store Influx Data
       // Try to take the mutex but don't wait for long
+      #ifdef InfluxLogging
       if(xSemaphoreTake(InfluxClientMutex, ( TickType_t ) HighRateMutexWaitTicks) == pdTRUE) 
       { // Send Point to Transmission Buffer
         #if defined(SerialDebugMode) && defined(HighRateDetailDebugging)
@@ -136,6 +172,7 @@ void startHighRateSensors()
           Serial.println("Highrate during alt store");
         #endif
       } // mutex take
+      #endif
 
       #if defined(SerialDebugMode) && defined(HighRateDetailDebugging)
         Serial.println("Highrate Return Mutex");
