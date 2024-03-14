@@ -20,76 +20,25 @@ void startHighRateSensors()
   esp_timer_start_periodic(ISM330DHCX_Timer, (1000000 / ISM330DHCX_RunsPerSecond));
 }
 
+void stopHighRateSensors()
+{
+ // Todo
+}
+
 // FastSensorExample_Timer 'ISR' Callback Function
     // static void FastSensorExample_Callback(void* args)
     // {
     //   if(!FastSensorExample_Run) // Remote disable last-ditch check
     //     return;
-    //
-    //   #ifdef InfluxLogging
-    //   // Create local datapoint
-    //   Point datapoint(FastSensorExample_Name);
-    //   datapoint.addTag("device", DEVICE);
 
-    //   // Attatch Timestamp to Data
-    //   datapoint.setTime(WritePrecision::US);
-    //   #endif
-
-      // #ifdef SDLogging
-      // unsigned long long timestampuS = getuSeconds();
-      // unsigned long long timestampS = getSeconds();
-      // #endif
+    // unsigned long long timestampuS = getuSeconds();
+    // unsigned long long timestampS = getSeconds();
 
 
     //   // Poll & Process Sensor Data
     //   int data = digitalRead(FastSensorExample_Pin)
-    //   #ifdef digitalRead(FastSensorExample_Pin)
-    //   datapoint.addField("Example Fast Value", data);
-    //   #endif
-
-      // #ifdef SDLogging
-      // logDataPoint(timestampuS, timestampS, "Example Fast Value", data, true);
-      // #endif
-
-      // #if defined(SerialDebugMode) && defined(HighRateDetailDebugging)
-      //   Serial.println("Highrate before store");
-      // #endif
-
-      // // Store Influx Data
-      // // Try to take the mutex but don't wait for long
-      // #ifdef InfluxLogging
-      // if(xSemaphoreTake(InfluxClientMutex, ( TickType_t ) HighRateMutexWaitTicks) == pdTRUE) 
-      // { // Send Point to Transmission Buffer
-      //   #if defined(SerialDebugMode) && defined(HighRateDetailDebugging)
-      //     Serial.println("Highrate Take Mutex");
-      //   #endif
-
-      //   writeError = writeError || client.writePoint(datapoint);
-
-      //   fastPointCount++;
-
-      //   xSemaphoreGive(InfluxClientMutex); // After accessing the shared resource give the mutex and allow other processes to access it
-      // }
-      // else
-      // { // We could not obtain the semaphore and can therefore not access the shared resource safely.
-      //   // Send Point to alternate buffer
-      //   #if defined(SerialDebugMode) && defined(HighRateDetailDebugging)
-      //     Serial.println("Highrate during early  alt store");
-      //   #endif
-
-      //   fast_datapoints[fastPointCountAlt] = new Point(datapoint);//datapoint;// Core 0 Panic (Store Prohibited) Occurs here
-
-      //   fastPointCountAlt++;
-
-      //   #if defined(SerialDebugMode) && defined(HighRateDetailDebugging)
-      //     Serial.println("Highrate during alt store");
-      //   #endif
-      // } // mutex take
-      // #endif
-
-      // #if defined(SerialDebugMode) && defined(HighRateDetailDebugging)
-      //   Serial.println("Highrate Return Mutex");
-      // #endif
+ 
+    // logDataPoint(timestampuS, timestampS, FastSensorExample_Name, "Example Fast Value", data, true);
     // } // End FastSensorExample_Callback
 
 
@@ -99,19 +48,8 @@ void startHighRateSensors()
       if (!ISM330DHCX_Run) // Remote disable last-ditch check
         return;
 
-      #ifdef InfluxLogging
-      // Create local datapoint
-      Point datapoint(ISM330DHCX_Name);
-      datapoint.addTag("device", DEVICE);
-
-      // Attatch Timestamp to Data
-      datapoint.setTime(WritePrecision::US);
-      #endif
-
-      #ifdef SDLogging
       unsigned long long timestampuS = getuSeconds();
       unsigned long long timestampS = getSeconds();
-      #endif
 
       // Poll Sensor Data
       sensors_event_t accel;
@@ -120,63 +58,12 @@ void startHighRateSensors()
 
       ism330dhcx.getEvent(&accel, &gyro, &temp);
 
-      #ifdef InfluxLogging
-      datapoint.addField("Gyro X", gyro.gyro.x);
-      datapoint.addField("Gyro Y", gyro.gyro.y);
-      datapoint.addField("Gyro Z", gyro.gyro.z);
-      datapoint.addField("Accel X", accel.acceleration.x);
-      datapoint.addField("Accel Y", accel.acceleration.y);
-      datapoint.addField("Accel Z", accel.acceleration.z);
-      #endif
-      
-      #ifdef SDLogging
-      logDataPoint(timestampuS, timestampS, "Gyro X", gyro.gyro.x);
-      logDataPoint(timestampuS, timestampS, "Gyro Y", gyro.gyro.y);
-      logDataPoint(timestampuS, timestampS, "Gyro Z", gyro.gyro.z);
-      logDataPoint(timestampuS, timestampS, "Accel X", accel.acceleration.x);
-      logDataPoint(timestampuS, timestampS, "Accel Y", accel.acceleration.y);
-      logDataPoint(timestampuS, timestampS, "Accel Z", accel.acceleration.z, true);
-      #endif
-
-      #if defined(SerialDebugMode) && defined(HighRateDetailDebugging)
-        Serial.println("Highrate before store");
-      #endif
-
-      // Store Influx Data
-      // Try to take the mutex but don't wait for long
-      #ifdef InfluxLogging
-      if(xSemaphoreTake(InfluxClientMutex, ( TickType_t ) HighRateMutexWaitTicks) == pdTRUE) 
-      { // Send Point to Transmission Buffer
-        #if defined(SerialDebugMode) && defined(HighRateDetailDebugging)
-          Serial.println("Highrate Take Mutex");
-        #endif
-
-        writeError = writeError || client.writePoint(datapoint);
-
-        fastPointCount++;
-
-        xSemaphoreGive(InfluxClientMutex); // After accessing the shared resource give the mutex and allow other processes to access it
-      }
-      else
-      { // We could not obtain the semaphore and can therefore not access the shared resource safely.
-        // Send Point to alternate buffer
-        #if defined(SerialDebugMode) && defined(HighRateDetailDebugging)
-          Serial.println("Highrate during early  alt store");
-        #endif
-
-        fast_datapoints[fastPointCountAlt] = new Point(datapoint);//datapoint;// Core 0 Panic (Store Prohibited) Occurs here
-
-        fastPointCountAlt++;
-
-        #if defined(SerialDebugMode) && defined(HighRateDetailDebugging)
-          Serial.println("Highrate during alt store");
-        #endif
-      } // mutex take
-      #endif
-
-      #if defined(SerialDebugMode) && defined(HighRateDetailDebugging)
-        Serial.println("Highrate Return Mutex");
-      #endif
+      logDataPoint(timestampuS, timestampS, ISM330DHCX_Name, "Gyro X", gyro.gyro.x);
+      logDataPoint(timestampuS, timestampS, ISM330DHCX_Name, "Gyro Y", gyro.gyro.y);
+      logDataPoint(timestampuS, timestampS, ISM330DHCX_Name, "Gyro Z", gyro.gyro.z);
+      logDataPoint(timestampuS, timestampS, ISM330DHCX_Name, "Accel X", accel.acceleration.x);
+      logDataPoint(timestampuS, timestampS, ISM330DHCX_Name, "Accel Y", accel.acceleration.y);
+      logDataPoint(timestampuS, timestampS, ISM330DHCX_Name, "Accel Z", accel.acceleration.z, true);
     } // End ISM330DHCX_Callback
   
 

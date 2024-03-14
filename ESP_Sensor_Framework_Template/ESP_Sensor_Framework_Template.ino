@@ -25,7 +25,11 @@
 
 // InfluxDB
 #include <InfluxDbClient.h>
-// #include <InfluxDbCloud.h>
+#include <InfluxDbCloud.h>
+
+// MQTT Client
+#include <ESP32HTTPUpdateServer.h>
+#include <EspMQTTClient.h> // By Patrick Lapointe
 
 // SD Card
 #include <FS.h>

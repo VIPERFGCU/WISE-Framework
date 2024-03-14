@@ -16,7 +16,7 @@
 #define HasNeopixel
 
 // Data Logging Modes
-// #define InfluxLogging
+#define InfluxLogging
 #define SDLogging
 
 
@@ -53,13 +53,13 @@
 // MQTT Server information
 #define MQTT_SERVER "69.88.163.33"
 #define MQTT_PORT 1883
-#define MQTT_SUBCRIBE_TOPIC "topic/fromNR"
-#define MQTT_PUBLISH_TOPIC "topic/toNR"
+#define MQTT_TOPIC_SUBCRIBE "topic/fromNR"
+#define MQTT_TOPIC_PUBLISH "topic/toNR"
 
 // NODE-RED Commands
 #define NODE_RED_START "start"
 #define NODE_RED_STOP "stop"
-#define NODE_RED_RESTART "reset"
+#define NODE_RED_RESET "reset"
 
 // Transmission Batching Controls
 #define BATCH_SIZE 150

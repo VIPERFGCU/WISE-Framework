@@ -399,39 +399,74 @@ void transmitInfluxBuffer()
     Serial.println("Emptied Buffer, Done");
   #endif
 }
-#endif
+
+
+void logDataInflux(unsigned long long uS, unsigned long long S, String Module, String Sensor, String Value, bool final = false)
+{
+  static Point* datapoint;
+  if (!datapoint) // No point exists
+  {
+    datapoint = new Point(Module);
+    datapoint->addTag("device", DEVICE);
+    datapoint->setTime(S * 1000000LL + uS);
+  }
+
+  datapoint->addField(Sensor, Value);
+
+  if (final) // All data added to datapoint
+  {
+    // Store Influx Data
+    // Try to take the mutex but don't wait for long
+    #ifdef InfluxLogging
+    if(xSemaphoreTake(InfluxClientMutex, ( TickType_t ) HighRateMutexWaitTicks) == pdTRUE) 
+    { // Send Point to Transmission Buffer
+      #if defined(SerialDebugMode) && defined(HighRateDetailDebugging)
+        Serial.println("Highrate Take Mutex");
+      #endif
+
+      writeError = writeError || client.writePoint(*datapoint);
+
+      fastPointCount++;
+
+      xSemaphoreGive(InfluxClientMutex); // After accessing the shared resource give the mutex and allow other processes to access it
+
+      delete datapoint; // Deallocate memory
+    }
+    else
+    { // We could not obtain the semaphore and can therefore not access the shared resource safely.
+      // Send Point to alternate buffer
+      #if defined(SerialDebugMode) && defined(HighRateDetailDebugging)
+        Serial.println("Highrate during early  alt store");
+      #endif
+
+      fast_datapoints[fastPointCountAlt] = datapoint; // Transfer allocated memory
+
+      fastPointCountAlt++;
+
+      #if defined(SerialDebugMode) && defined(HighRateDetailDebugging)
+        Serial.println("Highrate during alt store");
+      #endif
+    } // mutex take
+    #endif
+
+    #if defined(SerialDebugMode) && defined(HighRateDetailDebugging)
+      Serial.println("Highrate Return Mutex");
+    #endif
+
+    datapoint = nullptr; // Reset pointer for next measurement
+  }
+}
+#endif // InfluxLogging
 
 
 #ifdef SDLogging
-// void logDataPoint(unsigned long long uS, unsigned long long S, String Sensor, String Value, bool final)
-// {
-//   if (dataLog)
-//     dataLog = SD.open(FILENAME(DEVICE), FILE_WRITE);
-
-//   // #ifdef SerialDebugMode
-//   // Serial.print("Data Logging - ");
-//   // Serial.println(dataLog);
-//   // #endif
-
-//   dataLog.print("Time: "); dataLog.print(S);
-//   dataLog.print(" "); dataLog.print(uS); dataLog.print(" - ");
-//   dataLog.print(Sensor); dataLog.print(": "); dataLog.println(Value);
-
-//   if(final)
-//   {
-//     dataLog.flush();
-//     dataLog.close();
-//   }
-// }
-
-void logDataPoint(unsigned long long uS, unsigned long long S, String Sensor, String Value, bool final = false)
-{
-  // Open the file if it's not already open
+void logDataSD(unsigned long long uS, unsigned long long S, String Module, String Sensor, String Value, bool final = false)
+{ // Open the file if it's not already open
   if (!dataLog)
     dataLog = SD.open(FILENAME(DEVICE), FILE_APPEND);
 
   if (dataLog) {
-    String data = "Time: " + String(S) + "S " + String(uS) + "uS - " + Sensor + Value;
+    String data = String(DEVICE) + " - Time: " + String(S) + "S " + String(uS) + "uS - " + Module + ": " + Sensor + " - " + Value;
     dataLog.println(data);
 
     #ifdef SerialDebugMode
@@ -449,27 +484,38 @@ void logDataPoint(unsigned long long uS, unsigned long long S, String Sensor, St
     #endif
   }
 }
+#endif // SD Logging
 
-void logDataPoint(unsigned long long uS, unsigned long long S, String Sensor, float Value, bool final = false) {
+void logDataPoint(unsigned long long uS, unsigned long long S, String Module, String Sensor, String Value, bool final = false)
+{
+  #ifdef SDLogging
+  logDataSD(uS, S, Module, Sensor, Value, final);
+  #endif
+
+  #ifdef InfluxLogging
+  logDataInflux(uS, S, Module, Sensor, Value, final);
+  #endif
+}
+
+void logDataPoint(unsigned long long uS, unsigned long long S, String Module, String Sensor, float Value, bool final = false) {
   char buffer[20]; // Adjust buffer size as needed
   dtostrf(Value, 12, 6, buffer); // Adjust precision as needed (currently 6 decimal places)
-  logDataPoint(uS, S, Sensor, String(buffer), final);
+  logDataPoint(uS, S, Module, Sensor, String(buffer), final);
 }
 
-void logDataPoint(unsigned long long uS, unsigned long long S, String Sensor, double Value, bool final = false) {
+void logDataPoint(unsigned long long uS, unsigned long long S, String Module, String Sensor, double Value, bool final = false) {
   char buffer[20]; // Adjust buffer size as needed
   dtostrf(Value, 12, 6, buffer); // Adjust precision as needed (currently 6 decimal places)
-  logDataPoint(uS, S, Sensor, String(buffer), final);
+  logDataPoint(uS, S, Module, Sensor, String(buffer), final);
 }
 
-void logDataPoint(unsigned long long uS, unsigned long long S, String Sensor, int Value, bool final = false) {
-  logDataPoint(uS, S, Sensor, String(Value), final);
+void logDataPoint(unsigned long long uS, unsigned long long S, String Module, String Sensor, int Value, bool final = false) {
+  logDataPoint(uS, S, Module, Sensor, String(Value), final);
 }
 
-void logDataPoint(unsigned long long uS, unsigned long long S, String Sensor, long Value, bool final = false) {
-  logDataPoint(uS, S, Sensor, String(Value), final);
+void logDataPoint(unsigned long long uS, unsigned long long S, String Module, String Sensor, long Value, bool final = false) {
+  logDataPoint(uS, S, Module, Sensor, String(Value), final);
 }
-#endif
 
 
 void setIsm330Config() { // From Arduino Example
@@ -613,16 +659,6 @@ void setIsm330Config() { // From Arduino Example
     ism330dhcx.configInt2(false, true, false); // gyro DRDY on INT2
 }
 
-void setMqttConfig()
-{
-  Serial.print("Connecting to: ");
-  Serial.print(MQTT_SERVER);
-  Serial.print(":");
-  Serial.println(MQTT_PORT);
-  Serial.print("Topic: ");
-  Serial.println(MQTT_TOPIC_PUBLISH);
-}
-
 void onConnectionEstablished()
 {
   mqttClient.enableDebuggingMessages();
@@ -630,10 +666,12 @@ void onConnectionEstablished()
   mqttClient.publish(MQTT_TOPIC_SUBCRIBE, "Device connected.", 0);
   mqttClient.subscribe(MQTT_TOPIC_PUBLISH, [](const String & payload)
   {
+    #ifdef SerialDebugMode
     Serial.print("Message arrived on topic: ");
     Serial.print(MQTT_TOPIC_PUBLISH);
     Serial.print(". Message: ");
     Serial.println(payload);
+    #endif
 
     if (payload == NODE_RED_RESET)
     {
@@ -644,10 +682,9 @@ void onConnectionEstablished()
     {
       ISM330DHCX_Run = false;
       RSSI_Run = false;
+      #ifdef InfluxLogging
       transmitInfluxBuffer();
-      slowPointCount = 0;
-      fastPointCount = 0;
-      fastPointCountAlt = 0;
+      #endif
 
       #ifdef SerialDebugMode
       Serial.println("Recording stopped");
@@ -663,7 +700,9 @@ void onConnectionEstablished()
       #endif
     }
   }, 0);
+  #ifdef SerialDebugMode
   Serial.println("Connected to MQTT broker.");
+  #endif
 }
 
 #endif // FunctionsCode
