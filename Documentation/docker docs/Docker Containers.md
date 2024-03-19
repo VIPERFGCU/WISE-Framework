@@ -55,8 +55,8 @@ sudo docker run -it -d \
       --restart "unless-stopped" \
       -p 1883:1883 \
       -p 9001:9001 \
-      -v /var/lib/mosquitto/config/mosquitto.conf:/mosquitto/config/mosquitto.conf \
-      -v /var/lib/mosquitto/config/mosquitto.pw:/mosquitto/config/mosquitto.pw \
+      --volume /var/lib/mosquitto/config/mosquitto.conf:/mosquitto/config/mosquitto.conf \
+      --volume /var/lib/mosquitto/config/mosquitto.pw:/mosquitto/config/mosquitto.pw \
       eclipse-mosquitto
 ```
 
