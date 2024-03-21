@@ -1,8 +1,18 @@
-// Prototypes.h
-// Function Prototypes
-// Written By: Jordan Kooyman
+/**
+ * @file Prototypes.h
+ * @brief Function prototypes for the entire program.
+ * @authors Jordan Kooyman and Andrew Bryan
+ *
+ * This file contains the function prototypes for various functions used throughout
+ * the program. These prototypes declare the function signatures, allowing other
+ * parts of the program to call these functions without needing to know their
+ * implementation details.
+ *
+ * The prototypes in this file likely correspond to the function implementations
+ * found in other files, such as Functions.cpp or SensorsFast.cpp.
+ */
 
-// ESP_GPS_Timers_Config_Example_Reference.ino
+// ESP_Sensor_Framework_Template.ino
 void setup();
 void loop();
 
