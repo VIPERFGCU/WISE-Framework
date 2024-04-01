@@ -1,7 +1,7 @@
 # Creating Docker containers
 ## InfluxDB
 ```
-docker run -d -it \
+sudo docker run -d -it \
       --name {yourContainerName} \
       --restart "unless-stopped" \
       -p 8086:8086 \
@@ -12,7 +12,7 @@ docker run -d -it \
 
 ## Grafana
 ```
-docker run -d -it \
+sudo docker run -d -it \
       --name {yourContainerName} \
       --restart "unless-stopped" \
       -p 3000:3000 \ 
@@ -38,7 +38,7 @@ Organization: "YOUR ORG ID"
 
 ## NodeRED
 ```
-docker run -d -it \
+sudo docker run -d -it \
       --name {yourContainerName} \
       --restart "unless-stopped" \
       -p 1880:1880 \
@@ -70,4 +70,7 @@ Example:
 
 `sudo docker network create myBridge`
 
-`sudo docker network connect myBridge container1 container2 container3`...
+`sudo docker network connect myBridge container1`
+`sudo docker network connect myBridge container2`
+`sudo docker network connect myBridge container3`
+`sudo docker network connect myBridge container4`
