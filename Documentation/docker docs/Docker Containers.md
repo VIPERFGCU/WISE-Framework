@@ -22,6 +22,21 @@ sudo docker run -d -it \
       grafana/grafana-enterprise
 ```
 
+If using bind mounts with Grafana, file permissions must be set up properly.
+
+the workaround is to:
+
+    manually create an empty grafana.ini in the volume of local host that will be mapped as bind volume to /etc/grafana/grafana.ini
+
+    manually create empty directories in below volumes of local host that will be mapped as bind volume to:
+    etc/grafana/provisioning/datasources
+    etc/grafana/provisioning/plugins
+    etc/grafana/provisioning/notifiers
+    etc/grafana/provisioning/dashboards
+
+    set all above manually created file and directories to user=472 group=0
+Taken from [here](https://github.com/grafana/grafana/issues/51860#issuecomment-1178651261)
+
 
 ### Configuring the datasource
 Query Language - Flux
@@ -69,7 +84,6 @@ Example:
 
 
 `sudo docker network create myBridge`
-
 `sudo docker network connect myBridge container1`
 `sudo docker network connect myBridge container2`
 `sudo docker network connect myBridge container3`
