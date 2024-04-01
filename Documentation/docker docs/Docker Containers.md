@@ -2,7 +2,7 @@
 ## InfluxDB
 ```
 sudo docker run -d -it \
-      --name {yourContainerName} \
+      --name yourInfluxName \
       --restart "unless-stopped" \
       -p 8086:8086 \
       -v myInfluxVolume:/var/lib/influxdb2 \
@@ -13,7 +13,7 @@ sudo docker run -d -it \
 ## Grafana
 ```
 sudo docker run -d -it \
-      --name {yourContainerName} \
+      --name yourGrafanaName \
       --restart "unless-stopped" \
       -p 3000:3000 \ 
       --user root \
@@ -54,7 +54,7 @@ Organization: "YOUR ORG ID"
 ## NodeRED
 ```
 sudo docker run -d -it \
-      --name {yourContainerName} \
+      --name yourNodeREDname \
       --restart "unless-stopped" \
       -p 1880:1880 \
       -v node_red_data:/data \
@@ -66,7 +66,7 @@ sudo docker run -d -it \
 Make sure that the mounted files are already created on the host machine at:
 ```
 sudo docker run -it -d \
-      --name {yourContainerName} \
+      --name yourMosquittoName \
       --restart "unless-stopped" \
       -p 1883:1883 \
       -p 9001:9001 \
@@ -84,7 +84,11 @@ Example:
 
 
 `sudo docker network create myBridge`
+
 `sudo docker network connect myBridge container1`
+
 `sudo docker network connect myBridge container2`
+
 `sudo docker network connect myBridge container3`
+
 `sudo docker network connect myBridge container4`
