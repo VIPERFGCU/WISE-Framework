@@ -177,7 +177,8 @@ void setup() {
  * 3. Performs GPS time resynchronization if the `GPSSync` flag is set.
  * 4. Updates the stored system time for GPS interrupt usage.
  * 5. Transmits the Influx buffer if the total data points exceed a certain percentage
- *    of the batch size (if `InfluxLogging` is defined).
+ *    of the batch size (if `InfluxLogging` is defined). Repeats until buffers emptied,
+ *    or the sequential transmit limit is reached.
  * 6. Handles client write errors (if `InfluxLogging` is defined).
  * 7. Checks if any low-rate sensors should be polled again.
  * 8. Keeps the MQTT connection alive by calling `mqttClient.loop()`.
@@ -228,14 +229,13 @@ void loop() {
   }
 
 
-  // Update Stored System Time for GPS Interrupt Usage
-  // gettimeofday(&tv, nullptr);
-
 #ifdef InfluxLogging
-  // Start Transmitting Data if total amount is nearing target Batch Size
-  if ((slowPointCount + fastPointCount) > (BATCH_SIZE * (StartTransmissionPercentage / 100.0))) {
+  // Start Transmitting Data if total amount is nearing target Batch Size, repeat until buffer not considered "nearing full"
+  char count = 0; // In theory, could get stuck transmitting infinitely if highrate runs too fast; limit how many sequential runs can occur
+  while ((slowPointCount + fastPointCount) > (BATCH_SIZE * (StartTransmissionPercentage / 100.0)) && (count < InfluxSequentialTransmitLimit)) {
     transmitInfluxBuffer();
-  }
+    count++;
+  } 
 
   // Client Write Error Handling
   if (writeError) {
@@ -255,7 +255,7 @@ void loop() {
     display.println(client.isBufferFull() ? "Yes" : "No");
     display.display();
 #endif
-  }
+  } // end writeError handling
 #endif
 
   // Check if any low-rate sensors should be polled again (no interrupts called)
