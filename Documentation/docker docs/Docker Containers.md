@@ -1,8 +1,8 @@
 # Creating Docker containers
 ## InfluxDB
 ```
-docker run -d -it \
-      --name {yourContainerName} \
+sudo docker run -d -it \
+      --name yourInfluxName \
       --restart "unless-stopped" \
       -p 8086:8086 \
       -v myInfluxVolume:/var/lib/influxdb2 \
@@ -12,8 +12,8 @@ docker run -d -it \
 
 ## Grafana
 ```
-docker run -d -it \
-      --name {yourContainerName} \
+sudo docker run -d -it \
+      --name yourGrafanaName \
       --restart "unless-stopped" \
       -p 3000:3000 \ 
       --user root \
@@ -21,6 +21,21 @@ docker run -d -it \
       --volume /etc/grafana:/etc/grafana \
       grafana/grafana-enterprise
 ```
+
+If using bind mounts with Grafana, file permissions must be set up properly.
+
+the workaround is to:
+
+    manually create an empty grafana.ini in the volume of local host that will be mapped as bind volume to /etc/grafana/grafana.ini
+
+    manually create empty directories in below volumes of local host that will be mapped as bind volume to:
+    etc/grafana/provisioning/datasources
+    etc/grafana/provisioning/plugins
+    etc/grafana/provisioning/notifiers
+    etc/grafana/provisioning/dashboards
+
+    set all above manually created file and directories to user=472 group=0
+Taken from [here](https://github.com/grafana/grafana/issues/51860#issuecomment-1178651261)
 
 
 ### Configuring the datasource
@@ -38,8 +53,8 @@ Organization: "YOUR ORG ID"
 
 ## NodeRED
 ```
-docker run -d -it \
-      --name {yourContainerName} \
+sudo docker run -d -it \
+      --name yourNodeREDname \
       --restart "unless-stopped" \
       -p 1880:1880 \
       -v node_red_data:/data \
@@ -51,7 +66,7 @@ docker run -d -it \
 Make sure that the mounted files are already created on the host machine at:
 ```
 sudo docker run -it -d \
-      --name {yourContainerName} \
+      --name yourMosquittoName \
       --restart "unless-stopped" \
       -p 1883:1883 \
       -p 9001:9001 \
@@ -70,4 +85,10 @@ Example:
 
 `sudo docker network create myBridge`
 
-`sudo docker network connect myBridge container1 container2 container3`...
+`sudo docker network connect myBridge container1`
+
+`sudo docker network connect myBridge container2`
+
+`sudo docker network connect myBridge container3`
+
+`sudo docker network connect myBridge container4`
