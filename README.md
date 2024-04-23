@@ -73,6 +73,7 @@ The template code is available here, designed to be modified and uploaded to the
 - [ ]  Test the time synchronization with the GPS module
 - [ ]  Test the water resistance of the hardware box
 - [ ]  Add a license to this repository
+- [ ]  Design second prototype with a smaller case and 1 sensor
 - [ ]  Expand and improve documentation
 - [ ]  Validate long-term durability of design, physical and digital (is heat an issue?)
 - [ ]  Restructure the codebase to make each sensor's functions a separate source file that can be included or excluded with only a line or two of code (compiler directives?)
