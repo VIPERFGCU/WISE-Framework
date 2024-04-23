@@ -41,18 +41,21 @@ the workaround is to:
 Taken from [here](https://github.com/grafana/grafana/issues/51860#issuecomment-1178651261)
 
 
-### Configuring the datasource
+#### Configuring the datasource
+Navigate to Home > Connections > Add new connection
+- Select InfluxDB > Add new data source
+
 Query Language - Flux
 
-Http - http://{docker_container_name}:port Example: (http://influxdb:8086)
+HTTP URL: http://\<docker_container_name\>:port (http://yourInfluxName:8086)
 
-HTTP Headers
+Custom HTTP Headers > Add Header
 
 Header: "Authorization" 
 
 Value: "Token YOUR_API_TOKEN_HERE"
 
-Organization: "YOUR ORG ID"
+Organization: "YOUR_ORG_ID_HERE"
 
 ## NodeRED
 ```
