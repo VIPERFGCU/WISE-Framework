@@ -1,5 +1,5 @@
 # Creating Docker containers
-## Prerequisites
+### Prerequisites
 [Docker](https://docs.docker.com/get-docker/)
 ## Using Docker Compose
 
@@ -20,8 +20,8 @@ docker run -d -it \
       --name yourGrafanaName \
       --restart "unless-stopped" \
       -p 3000:3000 \ 
-      -volume /var/lib/grafana:/var/lib/grafana \
-      -volume /etc/grafana:/etc/grafana \
+      -v grafana_data:/var/lib/grafana \
+      -v grafana_config:/etc/grafana \
       grafana/grafana-enterprise
 ```
 

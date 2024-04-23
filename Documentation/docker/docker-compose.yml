@@ -21,6 +21,7 @@ services:
         user: root
         volumes:
             - grafana-data:/var/lib/grafana
+            - grafana-config:/etc/grafana
         image: grafana/grafana-enterprise
     node-red:
         stdin_open: true
@@ -53,3 +54,5 @@ volumes:
         name: node-red-data
     grafana-data:
       name: grafana-data
+    grafana-config:
+      name: grafana-config

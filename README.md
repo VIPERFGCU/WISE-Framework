@@ -1,7 +1,7 @@
 # WISE-Framework
 The Wireless Intelligent Sensor Ecosystem (WISE) Framework is an open-source modular project with examples for managing and deploying low-cost sensors for bulk data collection, with a focus on structural and environmental data collection.
 
-![Example WISE Sensor Deployed, the First Outdoor Development Prototype](Documentation/Example%20Deployment%20Cropped.jpg)
+![Example WISE Sensor Deployed, the First Outdoor Development Prototype](Documentation/images/Example%20Deployment%20Cropped.jpg)
 This is the first prototype developed specifically for this project, designed to test many aspects and allow for easier development. WISE Sensors can take a smaller shape with fewer or more sensors, as needed.
 
 This project was originally intended to be a single accelerometer affixed to a structure, such as a bridge, to monitor the structural health by observing the transmitted frequencies and harmonics.
@@ -32,7 +32,7 @@ This project framework currently offers the end user the ability to connect as m
 - Core 0 of the ESP32 is tasked with handling interrupts to process all time-sensitive sensor polling and data storage as well as the time resync through the GPS module.
 - Core 1 of the ESP32 is tasked with managing all the low-rate sensors using software timers as well as handling the wireless connection to the remote database and the initial setup procedure during boot-up.
 
-![Structure Diagram for ESP32 Framework](Documentation/ESP%20Program%20Structure%202.0.png)
+![Structure Diagram for ESP32 Framework](Documentation/images/ESP%20Program%20Structure%202.0.png)
 
 ### Processes on ESP32
 - With the GPS Module, the precise "Pulse Per Second" output is used, which goes to a 'high' state for a very short duration at the start of every second, which can be utilized to counteract any natural drift of the internal clock. 
@@ -48,13 +48,13 @@ This project framework currently offers the end user the ability to connect as m
 ## Hardware
 The project is based around an ESP32 microcontroller, with an attached GPS module for real-time time synchronization. Connect any compatible sensor to the ESP32, and that represents the core of this project.
 
-![Core of the System](Documentation/Core%20of%20System.jpg)
+![Core of the System](Documentation/images/Core%20of%20System.jpg)
 
 Optionally, you can add more sensors, a battery, a solar panel with a charge controller, an SD Card, a display, a LoRa radio, or anything else compatible with the ESP32. Put it all in a water-resistant box, and it can be deployed outside for remote sensing tasks.
 
 A [sample BOM](Sensor%20BOM.xlsx) is provided, primarily utilizing Adafruit as a vendor. The Feather series of development boards makes things very easy to prototype with and develop small-batch projects.
 
-![Our First Outdoor Prototype, Labelled](Documentation/System.png)
+![Our First Outdoor Prototype, Labelled](Documentation/images/System.png)
 
 ## Software Setup
 The code is designed such that most configurations will take place exclusively in [Configuration.h](ESP_Sensor_Framework_Template/Code/Configuration.h).
@@ -64,7 +64,48 @@ Support for additional sensor modules will need to be added to the appropriate s
 The template code is available here, designed to be modified and uploaded to the ESP32 using Arduino IDE.
 
 ## Server Setup
-[To Be Added]
+The framework is built using four different applications running on four separate docker containers.
+- [InfluxDB](https://www.influxdata.com/) - Time Series Database
+- [Grafana](https://grafana.com/) - Data Visualization
+- [Node-RED](https://nodered.org/) - Sensor Management
+- [Mosquitto](https://mosquitto.org/) - MQTT Broker
+
+### Prerequisites
+[Docker](https://docs.docker.com/get-docker/)
+
+[Docker Compose](https://docs.docker.com/compose/install/) - If using docker compose
+
+### Container Preparation
+Prepare the config files for the Mosquitto container using the instructions [here](Documentation/docker/Node-RED_and_Mosquitto.md).
+
+Using docker compose, you can run the [docker-compose.yml](Documentation/docker/docker-compose.yml) with `docker compose up`.
+
+or running the docker commands from [here](Documentation/docker/docker_commands.md).
+
+### InfluxDB
+- Complete the initial setup through the website (www.example.com:8080)
+- Create a bucket
+
+### Grafana
+- Complete the initial setup through the website (www.example.com:3000)
+  - default username: admin
+  - default password: admin
+
+#### Configuring the datasource
+Navigate to Home > Connections > Add new connection
+- Select InfluxDB > Add new data source
+
+Query Language - Flux
+
+HTTP URL: http://\<docker_container_name\>:port (http://yourInfluxName:8086)
+
+Custom HTTP Headers > Add Header
+
+Header: "Authorization" 
+
+Value: "Token YOUR_API_TOKEN_HERE"
+
+Organization: "YOUR_ORG_ID_HERE"
 
 ## ToDo & Future Expansions
 - [X]  Publish project to GitHub
