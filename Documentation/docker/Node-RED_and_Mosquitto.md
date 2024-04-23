@@ -47,7 +47,7 @@ Node-RED Node Configuration
 ![MQTT In Node](../images/MQTT_IN.png)
 
 ### MQTT Broker 
-Add a new broker by clicking the edit button to the right of "Add new mqtt-broker"
+Add a new broker by clicking the edit button to the right of "Add new mqtt-broker..."
 ![MQTT Setup](../images/Add_Broker.png)
 
 ### MQTT Out
