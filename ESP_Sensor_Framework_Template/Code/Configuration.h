@@ -14,12 +14,14 @@
 // #define HighRateDetailDebugging
 // #define InterruptDebugging
 #define SerialBaudRate 115200
-// #define OLEDDebugging
+// #define OLEDDebugging // Not fully implemented, Untested
 #define HasNeopixel
 
 // Data Logging Modes
 #define InfluxLogging
 #define SDLogging
+
+// #define SDRedundantLoggingOnly
 
 
 // Device
@@ -65,8 +67,10 @@
 
 // Transmission Batching Controls
 #define BATCH_SIZE 150
-#define StartTransmissionPercentage 60
+#define BATCH_SIZE 250
+#define StartTransmissionPercentage 50
 #define HighRateMutexWaitTicks 10
+#define InfluxSequentialTransmitLimit 10
 
 // Time
 #define TimeZoneOffset "EST+5EDT,M3.2.0/2,M11.1.0/2"  // Check This! <--------------------------------------------------------
@@ -76,8 +80,7 @@
 // SD Card (Adalogger)
 #define STR_HELPER(x) #x
 #define STR(x) STR_HELPER(x)
-#define CONCAT(a, b) a "/" b
-#define FILENAME(device) (CONCAT(STR(device), "_Log.txt"))
+#define FILENAME "/" STR(DEVICE) "_Log.txt"
 
 
 // Global Variables:
@@ -116,6 +119,10 @@ EspMQTTClient mqttClient(
 // Configuration Sanity Checks
 #if !defined(InfluxLogging) && !defined(SDLogging)
 #error No Data Logging Selected
+#endif
+
+#if defined(SDRedundantLoggingOnly) && !defined(SDLogging)
+#error SD Logging must be enabled to use SD Redundant Logging
 #endif
 
 #endif  // ConfigCode

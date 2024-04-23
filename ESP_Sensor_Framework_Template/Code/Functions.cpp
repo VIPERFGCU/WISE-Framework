@@ -561,27 +561,30 @@ void transmitInfluxBuffer() {
 #if defined(SerialDebugMode) && defined(TransmitDetailDebugging)
     Serial.print("Transmit Done");
 #endif
+
+#if defined(SerialDebugMode) && defined(TransmitDetailDebugging)
+      Serial.print("Transmit Return Mutex");
+      Serial.print(" Aux Buffer Size: ");
+      Serial.print(fastPointCountAlt);
+#endif
+
+      for (int i = 0; i < fastPointCountAlt; i++) {                         // Buffer Queued Fast Rate Datapoints
+        writeError = writeError || client.writePoint(*fast_datapoints[i]);  // Dereference pointer to get the Point object
+      }
+
+#if defined(SerialDebugMode) && defined(TransmitDetailDebugging)
+      Serial.print(" - Queued Buffer into Influx ");
+#endif
+
+    fastPointCount = fastPointCountAlt;
+    slowPointCount = 0;
+
     xSemaphoreGive(InfluxClientMutex);  // After accessing the shared resource give the mutex and allow other processes to access it
   }
-  fastPointCount = 0;
-  slowPointCount = 0;
-
-#if defined(SerialDebugMode) && defined(TransmitDetailDebugging)
-  Serial.print("Transmit Return Mutex");
-  Serial.print(" Aux Buffer Size: ");
-  Serial.print(fastPointCountAlt);
-#endif
-
-  for (int i = 0; i < fastPointCountAlt; i++) {                         // Buffer Queued Fast Rate Datapoints
-    writeError = writeError || client.writePoint(*fast_datapoints[i]);  // Dereference pointer to get the Point object
-  }
-
-#if defined(SerialDebugMode) && defined(TransmitDetailDebugging)
-  Serial.print("Queued Buffer");
-#endif
+  
 
   fastPointCountAlt = 0;
-  // Iterate through the array and delete each element
+  // Iterate through the entire array and delete each element
   for (int i = 0; i < BATCH_SIZE; i++) {
     if (fast_datapoints[i] != nullptr) {  // Check if the element is not already deleted
       delete fast_datapoints[i];          // Delete the element
@@ -593,7 +596,7 @@ void transmitInfluxBuffer() {
 #if defined(SerialDebugMode) && defined(TransmitDetailDebugging)
   Serial.println("Emptied Buffer, Done");
 #endif
-}
+} // end transmitInfluxBuffer()
 
 /**
  * @brief Logs data to an Influx database.
@@ -654,17 +657,29 @@ void logDataInflux(unsigned long long uS, unsigned long long S, String Module, S
     } else {             // We could not obtain the semaphore and can therefore not access the shared resource safely.
       // Send Point to alternate buffer
       #if defined(SerialDebugMode) && defined(HighRateDetailDebugging)
-      Serial.println("Highrate during early  alt store");
+      Serial.println("Highrate during early alt store");
+      #endif
 
-      fast_datapoints[fastPointCountAlt] = datapoint;  // Transfer allocated memory
+      if(fastPointCountAlt < BATCH_SIZE)
+      {
+        fast_datapoints[fastPointCountAlt] = datapoint;  // Transfer allocated memory
 
-      fastPointCountAlt++;
+        fastPointCountAlt++;
+      }
+      else
+      {
+        #ifdef SerialDebugMode
+        Serial.println("Alternate Fast Point Buffer Full");
+        #endif
+
+        delete datapoint; // Deallocate memory and lose data
+        writeError = true;
+      }
 
       #if defined(SerialDebugMode) && defined(HighRateDetailDebugging)
       Serial.println("Highrate during alt store");
       #endif
-      #endif
-    }  // mutex take
+    }  // end mutex take
 
 
 #if defined(SerialDebugMode) && defined(HighRateDetailDebugging)
@@ -705,7 +720,7 @@ void logDataSD(unsigned long long uS, unsigned long long S, String Module, Strin
 {  
   // Open the file if it's not already open
   if (!dataLog)
-    dataLog = SD.open(FILENAME(DEVICE), FILE_APPEND);
+    dataLog = SD.open(FILENAME, FILE_APPEND);
 
   if (dataLog) {
     String data = String(DEVICE) + " - Time: " + String(S) + "S " + String(uS) + "uS - " + Module + ": " + Sensor + " - " + Value;
@@ -741,12 +756,20 @@ void logDataSD(unsigned long long uS, unsigned long long S, String Module, Strin
  * @return void
  */
 void logDataPoint(unsigned long long uS, unsigned long long S, String Module, String Sensor, String Value, bool final = false) {
-#ifdef SDLogging
-  logDataSD(uS, S, Module, Sensor, Value, final);
-#endif
-
 #ifdef InfluxLogging
   logDataInflux(uS, S, Module, Sensor, Value, final);
+#endif
+
+#ifdef SDLogging
+#ifdef SDRedundantLoggingOnly
+if (writeError)
+{
+#endif
+  logDataSD(uS, S, Module, Sensor, Value, final);
+#ifdef SDRedundantLoggingOnly
+writeError = false;
+}
+#endif
 #endif
 }
 
