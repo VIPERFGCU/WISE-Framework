@@ -66,7 +66,6 @@ docker run -d -it \
 
 
 ## Mosquitto
-Make sure that the mounted files are already created on the host machine at:
 ```
 docker run -d -it \
       --name yourMosquittoName \
@@ -77,9 +76,8 @@ docker run -d -it \
       --volume /var/lib/mosquitto/config/mosquitto.pw:/mosquitto/config/mosquitto.pw \
       eclipse-mosquitto
 ```
-
-
-https://community.home-assistant.io/t/help-with-mqtt-docker-setup/143759/4
+Make sure that the mounted files are already created on the host machine at the locations specified in the docker run command
+Addititional info [here](https://community.home-assistant.io/t/help-with-mqtt-docker-setup/143759/4)
 
 ## Docker Network
 Add all containers to the same docker network
