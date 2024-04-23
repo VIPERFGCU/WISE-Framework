@@ -20,8 +20,8 @@ docker run -d -it \
       --name yourGrafanaName \
       --restart "unless-stopped" \
       -p 3000:3000 \ 
-      -v grafana_data:/var/lib/grafana \
-      -v grafana_config:/etc/grafana \
+      -v grafana-data:/var/lib/grafana \
+      -v grafana-config:/etc/grafana \
       grafana/grafana-enterprise
 ```
 
