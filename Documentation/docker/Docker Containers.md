@@ -1,8 +1,12 @@
 # Creating Docker containers
+## Prerequisites
+[Docker](https://docs.docker.com/get-docker/)
+## Using Docker Compose
+
 ## InfluxDB
 ```
 docker run -d -it \
-      --name {yourContainerName} \
+      --name myInflux \
       --restart "unless-stopped" \
       -p 8086:8086 \
       -v myInfluxVolume:/var/lib/influxdb2 \
@@ -13,12 +17,11 @@ docker run -d -it \
 ## Grafana
 ```
 docker run -d -it \
-      --name {yourContainerName} \
+      --name myGrafana \
       --restart "unless-stopped" \
       -p 3000:3000 \ 
-      --user root \
-      --volume /var/lib/grafana:/var/lib/grafana \
-      --volume /etc/grafana:/etc/grafana \
+      -volume /var/lib/grafana:/var/lib/grafana \
+      -volume /etc/grafana:/etc/grafana \
       grafana/grafana-enterprise
 ```
 
@@ -39,7 +42,7 @@ Organization: "YOUR ORG ID"
 ## NodeRED
 ```
 docker run -d -it \
-      --name {yourContainerName} \
+      --name myNodeRED \
       --restart "unless-stopped" \
       -p 1880:1880 \
       -v node_red_data:/data \
@@ -50,8 +53,8 @@ docker run -d -it \
 ## Mosquitto
 Make sure that the mounted files are already created on the host machine at:
 ```
-sudo docker run -it -d \
-      --name {yourContainerName} \
+docker run -d -it \
+      --name myMosquitto \
       --restart "unless-stopped" \
       -p 1883:1883 \
       -p 9001:9001 \
