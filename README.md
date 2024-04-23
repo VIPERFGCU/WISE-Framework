@@ -83,11 +83,11 @@ Using docker compose, you can run the [docker-compose.yml](Documentation/docker/
 or running the docker commands from [here](Documentation/docker/docker_commands.md).
 
 ### InfluxDB
-- Complete the initial setup through the website (www.example.com:8080)
+- Complete the initial setup through the website. (www.example.com:8080)
 - Create a bucket
 
 ### Grafana
-- Complete the initial setup through the website (www.example.com:3000)
+- Complete the initial setup through the website. (www.example.com:3000)
   - default username: admin
   - default password: admin
 
