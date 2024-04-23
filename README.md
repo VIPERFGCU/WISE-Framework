@@ -1,12 +1,15 @@
 # WISE-Framework
 The Wireless Intelligent Sensor Ecosystem (WISE) Framework is an open-source modular project with examples for managing and deploying low-cost sensors for bulk data collection, with a focus on structural and environmental data collection.
 
+![Example WISE Sensor Deployed, the First Outdoor Development Prototype](Documentation/Example%20Deployment%20Cropped.jpg)
+This is the first prototype developed specifically for this project, designed to test many aspects and allow for easier development. WISE Sensors can take a smaller shape with fewer or more sensors, as needed.
+
 This project was originally intended to be a single accelerometer affixed to a structure, such as a bridge, to monitor the structural health by observing the transmitted frequencies and harmonics.
 
 This project framework currently offers the end user the ability to connect as many sensors as they want, within the physical limitations of the microcontroller, and manages the collection of the data.
 
 ## Features
-* High-rate polling (up to about 600hz between all connected sensors)
+* High-rate polling (up to about 600hz at minimum, shared between all connected sensors)
 * Low-rate polling (unlimited interval (in seconds) between sensor polling
 * Independent polling speed for each sensor
 * Modular design using low-cost readily available Arduino-compatible sensors and microcontrollers
@@ -24,18 +27,34 @@ This project framework currently offers the end user the ability to connect as m
 * Vehicle/vessel-mounted trip/environmental monitoring
 
 ## How it Works
-The framework is designed around the ESP32 S-series microcontroller family and utilizes both cores. 
+### Core Structure of the ESP32 Framework
+- The framework is designed around the ESP32 S-series microcontroller family and utilizes both cores. 
+- Core 0 of the ESP32 is tasked with handling interrupts to process all time-sensitive sensor polling and data storage as well as the time resync through the GPS module.
+- Core 1 of the ESP32 is tasked with managing all the low-rate sensors using software timers as well as handling the wireless connection to the remote database and the initial setup procedure during boot-up.
 
-Core 0 is tasked with handling interrupts to process all time-sensitive sensor polling and data storage as well as the time resync through the GPS module.
+![Structure Diagram for ESP32 Framework](Documentation/ESP%20Program%20Structure%202.0.png)
 
-Core 1 is tasked with managing all the low-rate sensors using software timers as well as handling the wireless connection to the remote database and the initial setup procedure during boot-up.
+### Processes on ESP32
+- With the GPS Module, the precise "Pulse Per Second" output is used, which goes to a 'high' state for a very short duration at the start of every second, which can be utilized to counteract any natural drift of the internal clock. 
+- Using this precise time, every data point collected has a precise timestamp attached, such that the data between multiple independent WISE Sensors will all show the same timestamp if collected at the same time, which allows for data analysis such as measuring the wave propagation speed through a material or structure.
+- Periodically, when the internal buffer for the data is approaching capacity, all data is diverted to an alternate buffer while the primary buffer is transmitted to the remote server database before the alternate buffer is loaded into the primary buffer and cleared, ready for the next cycle with no data lost.
+- Additionally, the data can be written directly to an SD card connected to the ESP32 as it is being collected, either in-place-of or in-addition-to the database logging.
+
+### Server Functions
+- When the data reaches the server, InfluxDB manages the storage of all the data, utilizing the included timestamp tag. This also means data can be added later by loading it from the SD card.
+- To visualize the data, InfluxDB offers a few basic graphs, but for more advanced visualization and analysis Grafana is used, which also allows for Python scripts to process the data.
+- From the server, each WISE Sensor can also be remotely controlled using NodeRed. Currently, it is possible to start and stop data recording, as well as to force the ESP32 to restart in the event of anomalous behavior.
 
 ## Hardware
 The project is based around an ESP32 microcontroller, with an attached GPS module for real-time time synchronization. Connect any compatible sensor to the ESP32, and that represents the core of this project.
 
+![Core of the System](Documentation/Core%20of%20System.jpg)
+
 Optionally, you can add more sensors, a battery, a solar panel with a charge controller, an SD Card, a display, a LoRa radio, or anything else compatible with the ESP32. Put it all in a water-resistant box, and it can be deployed outside for remote sensing tasks.
 
 A [sample BOM](Sensor%20BOM.xlsx) is provided, primarily utilizing Adafruit as a vendor. The Feather series of development boards makes things very easy to prototype with and develop small-batch projects.
+
+![Our First Outdoor Prototype, Labelled](Documentation/System.png)
 
 ## Software Setup
 The code is designed such that most configurations will take place exclusively in [Configuration.h](ESP_Sensor_Framework_Template/Code/Configuration.h).
@@ -45,7 +64,7 @@ Support for additional sensor modules will need to be added to the appropriate s
 The template code is available here, designed to be modified and uploaded to the ESP32 using Arduino IDE.
 
 ## Server Setup
-
+[To Be Added]
 
 ## ToDo & Future Expansions
 - [X]  Publish project to GitHub
