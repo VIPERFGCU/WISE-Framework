@@ -83,7 +83,7 @@ Using docker compose, you can run the [docker-compose.yml](Documentation/docker/
 or running the docker commands from [here](Documentation/docker/docker_commands.md).
 
 ### InfluxDB
-- Complete the initial setup through the website. (www.example.com:8086)
+- Complete the initial setup through the website. (www.example.com:8086).
 - Create a bucket
 
 ### Grafana
