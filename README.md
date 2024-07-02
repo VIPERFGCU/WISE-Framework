@@ -9,7 +9,7 @@ This project was originally intended to be a single accelerometer affixed to a s
 This project framework currently offers the end user the ability to connect as many sensors as they want, within the physical limitations of the microcontroller, and manages the collection of the data.
 
 ## Features
-* High-rate polling (up to about 600hz at minimum, shared between all connected sensors)
+* High-rate polling (up to at least 600hz, shared between all connected sensors)
 * Low-rate polling (unlimited interval (in seconds) between sensor polling
 * Independent polling speed for each sensor
 * Modular design using low-cost readily available Arduino-compatible sensors and microcontrollers
