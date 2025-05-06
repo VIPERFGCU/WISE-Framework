@@ -36,7 +36,7 @@ Bridge is an edge‑AI powered structural health monitoring system designed for 
 ## 🚀 Getting Started
 
 1. **Read Final Report**
-* Reading final report found here, will give you step-by-step process on how to configure and start working on bridge
+* Reading final report found [HERE](https://github.com/VIPERFGCU/WISE-Framework/blob/bridge/Bridge_Fall2024%E2%80%93Spring2025/Documentation/BRIDGE%20Project%20-%20Final%20Report.pdf), will give you step-by-step process on how to configure and start working on bridge
 
 ## 📞 Contact & Contribution
 
