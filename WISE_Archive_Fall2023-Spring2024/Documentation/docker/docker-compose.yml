@@ -1,0 +1,58 @@
+name: wise-framework
+services:
+    influxdb:
+        stdin_open: true
+        tty: true
+        container_name: yourinfluxname
+        restart: unless-stopped
+        ports:
+            - 8086:8086
+        volumes:
+            - influx-data:/var/lib/influxdb2
+            - influx-config:/etc/influxdb2
+        image: influxdb:latest
+    grafana-enterprise:
+        stdin_open: true
+        tty: true
+        container_name: yourgrafananame
+        restart: unless-stopped
+        ports:
+            - 3000:3000
+        user: root
+        volumes:
+            - grafana-data:/var/lib/grafana
+            - grafana-config:/etc/grafana
+        image: grafana/grafana-enterprise
+    node-red:
+        stdin_open: true
+        tty: true
+        container_name: yournoderedname
+        restart: unless-stopped
+        ports:
+            - 1880:1880
+        volumes:
+            - node-red-data:/data
+        image: nodered/node-red
+    eclipse-mosquitto:
+        stdin_open: true
+        tty: true
+        container_name: yourmosquittoname
+        restart: unless-stopped
+        ports:
+            - 1883:1883
+            - 9001:9001
+        volumes:
+            - /var/lib/mosquitto/config/mosquitto.conf:/mosquitto/config/mosquitto.conf
+            - /var/lib/mosquitto/config/mosquitto.pw:/mosquitto/config/mosquitto.pw
+        image: eclipse-mosquitto
+volumes:
+    influx-data:
+        name: influx-data
+    influx-config:
+        name: influx-config
+    node-red-data:
+        name: node-red-data
+    grafana-data:
+      name: grafana-data
+    grafana-config:
+      name: grafana-config
