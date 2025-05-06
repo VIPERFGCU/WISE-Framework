@@ -1,4 +1,4 @@
-# WISE-Framework
+# WISE-Framework (Fall 2023 - Spring 2024)
 The Wireless Intelligent Sensor Ecosystem (WISE) Framework is an open-source modular project with examples for managing and deploying low-cost sensors for bulk data collection, with a focus on structural and environmental data collection.
 
 ![Example WISE Sensor Deployed, the First Outdoor Development Prototype](Documentation/images/Example%20Deployment%20Cropped.jpg)
