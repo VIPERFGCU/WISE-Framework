@@ -1,0 +1,8 @@
+{
+  "esp32-test-01": {
+    "device_id": "esp32-test-01",
+    "label": "Test",
+    "notes": "Test",
+    "last_seen": null
+  }
+}

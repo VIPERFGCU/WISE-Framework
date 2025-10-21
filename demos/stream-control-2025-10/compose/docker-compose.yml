@@ -1,0 +1,46 @@
+services:
+  mosquitto:
+    image: eclipse-mosquitto:2
+    volumes:
+      - ../mosquitto.conf:/mosquitto/config/mosquitto.conf:ro
+      - mosq_data:/mosquitto/data
+    ports: 
+      - "1883:1883"
+    networks: [bridge_net]
+    restart: unless-stopped
+
+  backend:
+    build:
+      context: ../../../
+      dockerfile: ./Dockerfile    
+    environment:
+      INFLUX_TOKEN: ${INFLUX_TOKEN}
+      INFLUX_BUCKET: ${INFLUX_BUCKET}
+      ENABLE_MQTT: ${ENABLE_MQTT:-true}
+      MQTT_TOPIC: ${MQTT_TOPIC}
+      MQTT_HOST: ${MQTT_HOST}
+      MQTT_PORT: ${MQTT_PORT}
+      API_KEY: ${API_KEY}
+      JWT_SECRET: ${JWT_SECRET}
+      JWT_ALG: ${JWT_ALG}
+      ACCESS_TOKEN_EXPIRE_MINUTES: ${ACCESS_TOKEN_EXPIRE_MINUTES}
+      CORS_ALLOW_ORIGINS: ${CORS_ALLOW_ORIGINS}
+    depends_on: [mosquitto]
+    networks: [bridge_net]
+    ports: ["8000:8000"]
+
+  frontend:
+    build:
+      context: ../frontend
+    environment:
+      VITE_API_BASE: ${VITE_API_BASE}
+    ports: ["5173:80"]
+    networks: [bridge_net]
+
+networks:
+  bridge_net:
+    driver: bridge
+
+volumes:
+  mosq_data:
+
