@@ -6,7 +6,7 @@ A minimal backend interface for sensor ingest and querying, built with FastAPI. 
 - **influxdb**: time-series database (v2)
 - **mosquitto**: MQTT broker
 
-> Grafana is intentionally omitted. You can add it later just for ops visibility if needed.
+> Grafana is intentionally omitted. We can add it later.
 
 ## Quick start
 
