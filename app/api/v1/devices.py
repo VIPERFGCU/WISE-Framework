@@ -111,7 +111,6 @@ async def register_device(payload: DeviceCreate) -> DeviceOut:
     "",
     response_model=List[DeviceOut],
     summary="List devices with status",
-    dependencies=[Depends(deps.require_api_key_or_role("viewer"))],
 )
 async def list_devices() -> List[DeviceOut]:
     _ensure_mqtt_started()  # make sure cache is live
