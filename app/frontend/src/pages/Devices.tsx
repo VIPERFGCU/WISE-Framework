@@ -1,9 +1,10 @@
 import { useEffect, useMemo, useState } from "react";
-import { listDevices } from "../services/devices";
+import { listDevices, setRecording, setSensing } from "../services/devices";
 import type { Device, DeviceStatus } from "../types/device";
 import StatusBadge from "../components/StatusBadge";
 import BoolPill from "../components/BoolPill";
 import { formatUptime } from "../lib/format";
+import { emitError } from "../components/Toaster";
 
 type Tri = "all" | "yes" | "no";
 type SortKey = "uptime_asc" | "uptime_desc" | "status";
@@ -12,6 +13,10 @@ export default function Devices() {
   const [devices, setDevices] = useState<Device[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
+  // per-row action loading states
+  const [recBusy, setRecBusy] = useState<Record<string, boolean>>({});
+  const [senseBusy, setSenseBusy] = useState<Record<string, boolean>>({});
 
   // controls
   const [q, setQ] = useState("");
@@ -60,6 +65,38 @@ export default function Devices() {
 
     return out;
   }, [devices, q, status, rec, sense, sortKey]);
+
+  // actions (optimistic)
+  const toggleRecording = async (d: Device) => {
+	  const next = !d.recording;
+	  setRecBusy((m) => ({ ...m, [d.sensor_id]: true }));
+	  // optimistic local update
+	  setDevices((list) => list.map((x) => (x.sensor_id === d.sensor_id ? { ...x, recording: next } : x)));
+	  try {
+		  await setRecording(d.sensor_id, next);
+	  } catch (e: any) {
+		  // rollback on error
+		  setDevices((list) => list.map((x) => (x.sensor_id === d.sensor_id ? { ...x, recording: !next } : x)));
+		  emitError(e?.message ?? "Failed to update recording");
+	  } finally {
+		  setRecBusy((m) => ({ ...m, [d.sensor_id]: false }));
+	  }
+  };
+
+  const toggleSensing = async (d: Device) => {
+	  const next = !d.sensing;
+	  setSenseBusy((m) => ({ ...m, [d.sensor_id]: true }));
+	  setDevices((list) => list.map((x) => (x.sensor_id === d.sensor_id ? { ...x, sensing: next } : x)));
+	  try {
+		  await setSensing(d.sensor_id, next);
+	  } catch (e: any) {
+		  setDevices((list) => list.map((x) => (x.sensor_id === d.sensor_id ? { ...x, sensing: !next } : x)));
+		  emitError(e?.message ?? "Failed to update sensing");
+	  } finally {
+		  setSenseBusy((m) => ({ ...m, [d.sensor_id]: false }));
+	  }
+  };
+
 
   return (
     <div className="space-y-4">
@@ -145,6 +182,7 @@ export default function Devices() {
                 <th className="px-3 py-2">Recording</th>
                 <th className="px-3 py-2">Sensing</th>
                 <th className="px-3 py-2">Up time</th>
+		<th className="px-3 py-2">Actions</th>
               </tr>
             </thead>
             <tbody className="text-sm">
@@ -155,6 +193,26 @@ export default function Devices() {
                   <td className="px-3 py-2"><BoolPill value={d.recording} /></td>
                   <td className="px-3 py-2"><BoolPill value={d.sensing} /></td>
                   <td className="px-3 py-2">{formatUptime(d.uptime_seconds)}</td>
+		  <td className="px-3 py-2">
+		     <div className="flex items-center gap-2">
+		        <button
+			   onClick={() => toggleRecording(d)}
+			   disabled={!!recBusy[d.sensor_id]}
+			   className="px-2 py-1 text-xs border rounded bg-white hover:bg-gray-50 disabled:opacity-60"
+			   title={d.recording ? "Stop recording" : "Start recording"}
+			>
+			   {recBusy[d.sensor_id] ? "..." : d.recording ? "Stop Rec" : "Start Rec"}
+			</button>
+			<button
+			   onClick={() => toggleSensing(d)}
+			   disabled={!!senseBusy[d.sensor_id]}
+			   className="px-2 py1 text-xs border rounded bg-white hover:bg-gray-50 disabled:opacity-60"
+			   title={d.sensing ? "Stop sensing" : "Start sensing"}
+			>
+			   {senseBusy[d.sensor_id] ? "..." : d.sensing ? "Stop Sense" : "Start Sense"}
+			</button>
+		     </div>
+		  </td>
                 </tr>
               ))}
             </tbody>
