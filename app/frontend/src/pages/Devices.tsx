@@ -5,6 +5,7 @@ import StatusBadge from "../components/StatusBadge";
 import BoolPill from "../components/BoolPill";
 import { formatUptime, parseIsoMs, timeAgo } from "../lib/format";
 import { emitError } from "../components/Toaster";
+import DeviceDrawer from "../components/DeviceDrawer";
 
 type Tri = "all" | "yes" | "no";
 type SortKey = "uptime_asc" | "uptime_desc" | "status";
@@ -13,6 +14,7 @@ const STALE_SEC = 120; // mark devices stale if no update within 2 minutes
 
 export default function Devices() {
   const [devices, setDevices] = useState<Device[]>([]);
+  const [drawerFor, setDrawerFor] = useState<Device | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -233,6 +235,13 @@ export default function Devices() {
 			>
 			   {senseBusy[d.sensor_id] ? "..." : d.sensing ? "Stop Sense" : "Start Sense"}
 			</button>
+			<button
+				onClick={() => setDrawerFor(d)}
+				className="px-2 py-1 text-xs border rounded bg-white hover:bg-gray-50"
+				title="View details"
+			>
+				Details
+			</button>
 		     </div>
 		  </td>
                 </tr>
@@ -240,11 +249,18 @@ export default function Devices() {
 	      })}
             </tbody>
           </table>
+
           <div className="text-xs text-gray-500 mt-2">
 	  	Devices marked light gray are considered <span className="font-medium">stale</span> (no update in &gt; {STALE_SEC}s).
 	  </div>
-        </div>
+
+        </div> //Closing div for overflow-auto-x
       )}
+
+      {/* Drawer mounted at page root */}
+      <DeviceDrawer device={drawerFor} onClose={() => setDrawerFor(null)} />
+
+    //Closing wrapper div
     </div>
   );
 }
