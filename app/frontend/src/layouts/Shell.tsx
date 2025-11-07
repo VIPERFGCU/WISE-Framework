@@ -1,6 +1,7 @@
 import { Link, NavLink, Outlet } from "react-router-dom";
 import { Toaster } from "../components/Toaster";
 import TopLoader from "../components/TopLoader";
+import ErrorBoundary from "../components/ErrorBoundary";
 
 export default function Shell() {
   return (
@@ -9,6 +10,7 @@ export default function Shell() {
       <TopLoader />
       <Toaster />
 
+      <ErrorBoundary>
       {/* Sidebar */}
       <aside className="w-64 border-r bg-white">
         <div className="p-4 border-b">
@@ -44,6 +46,7 @@ export default function Shell() {
           <Outlet />
         </main>
       </div>
+      </ErrorBoundary>
     </div>
   );
 }
