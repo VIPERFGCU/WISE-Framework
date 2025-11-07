@@ -3,11 +3,13 @@ import { listDevices, setRecording, setSensing } from "../services/devices";
 import type { Device, DeviceStatus } from "../types/device";
 import StatusBadge from "../components/StatusBadge";
 import BoolPill from "../components/BoolPill";
-import { formatUptime } from "../lib/format";
+import { formatUptime, parseIsoMs, timeAgo } from "../lib/format";
 import { emitError } from "../components/Toaster";
 
 type Tri = "all" | "yes" | "no";
 type SortKey = "uptime_asc" | "uptime_desc" | "status";
+
+const STALE_SEC = 120; // mark devices stale if no update within 2 minutes
 
 export default function Devices() {
   const [devices, setDevices] = useState<Device[]>([]);
@@ -25,11 +27,15 @@ export default function Devices() {
   const [sense, setSense] = useState<Tri>("all");
   const [sortKey, setSortKey] = useState<SortKey>("uptime_desc");
 
+  // page-level "last loaded" clock
+  const [lastLoadAt, setLastLoadAt] = useState<number | null>(null);
+
   async function load() {
     try {
       setError(null);
       const data = await listDevices();
       setDevices(data ?? []);
+      setLastLoadAt(Date.now());
     } catch (e: any) {
       setError(e?.message ?? "Failed to fetch devices");
     } finally {
@@ -43,8 +49,9 @@ export default function Devices() {
     return () => clearInterval(id);
   }, []);
 
+  // Compute filtered + sorted rows
+  //filter
   const rows = useMemo(() => {
-    // filter
     let out = devices.filter((d) => {
       if (status !== "all" && d.status !== status) return false;
       if (rec !== "all" && d.recording !== (rec === "yes")) return false;
@@ -66,7 +73,13 @@ export default function Devices() {
     return out;
   }, [devices, q, status, rec, sense, sortKey]);
 
-  // actions (optimistic)
+  // helpers
+  function isStale(d: Device): boolean {
+	  const t = parseIsoMs(d.updated_at);
+	  if (!Number.isFinite(t)) return false; //Unknown -> don't publish
+	  return Date.now() - t > STALE_SEC * 1000;
+  }
+
   const toggleRecording = async (d: Device) => {
 	  const next = !d.recording;
 	  setRecBusy((m) => ({ ...m, [d.sensor_id]: true }));
@@ -102,7 +115,8 @@ export default function Devices() {
     <div className="space-y-4">
       <div className="flex items-center justify-between gap-3 flex-wrap">
         <h2 className="text-lg font-semibold">Devices</h2>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-4 text-sm text-gray-600">
+	   {lastLoadAt && <span>Last refresh: {timeAgo(Date.now() - lastLoadAt)}</span>}
           <button
             onClick={load}
             className="px-3 py-1.5 text-sm border rounded bg-white hover:bg-gray-50"
@@ -182,12 +196,20 @@ export default function Devices() {
                 <th className="px-3 py-2">Recording</th>
                 <th className="px-3 py-2">Sensing</th>
                 <th className="px-3 py-2">Up time</th>
+		<th className="px-3 py-2">Last Updated</th>
 		<th className="px-3 py-2">Actions</th>
               </tr>
             </thead>
             <tbody className="text-sm">
-              {rows.map((d) => (
-                <tr key={d.sensor_id} className="border-t">
+              {rows.map((d) => {
+		const t = parseIsoMs(d.updated_at);
+		const stale = isStale(d);
+		return (
+                 <tr 
+			key={d.sensor_id} 
+			className={`border-t ${stale ? "bg-gray-50 opacity-80": ""}`}
+			title={Number.isFinite(t) ? new Date(t).toLocaleString() : "unknown"}
+		 >
                   <td className="px-3 py-2 font-mono">{d.sensor_id}</td>
                   <td className="px-3 py-2"><StatusBadge status={d.status} /></td>
                   <td className="px-3 py-2"><BoolPill value={d.recording} /></td>
@@ -214,10 +236,13 @@ export default function Devices() {
 		     </div>
 		  </td>
                 </tr>
-              ))}
+              );
+	      })}
             </tbody>
           </table>
-          <div className="text-xs text-gray-500 mt-2">Auto-refreshing every 10s</div>
+          <div className="text-xs text-gray-500 mt-2">
+	  	Devices marked light gray are considered <span className="font-medium">stale</span> (no update in &gt; {STALE_SEC}s).
+	  </div>
         </div>
       )}
     </div>

@@ -9,6 +9,6 @@ export type HealthResponse = {
 
 export async function pingHealth(): Promise<HealthResponse> {
 	//Uses relative path so dev proxy forwards to http://localhost:8000
-	const { data } = await api.get<HealthResponse>("/api/health");
+	const { data } = await api.get<HealthResponse>("/health");
 	return data;
 }
