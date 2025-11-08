@@ -6,6 +6,8 @@ import Streams from "./pages/Streams";
 import Admin from "./pages/Admin";
 import Status from "./pages/Status";
 import NotFound from "./pages/NotFound";
+import ProtectedRoute from "./auth/ProtectedRoute";
+import Login from "./pages/Login";
 
 export default function App() {
   return (
@@ -15,6 +17,10 @@ export default function App() {
         <Route path="devices" element={<Devices />} />
         <Route path="streams" element={<Streams />} />
         <Route path="admin" element={<Admin />} />
+	<Route path="login" element={<Login />} />
+	<Route element={<ProtectedRoute />}>
+		<Route path="admin" element={<Admin />} />
+	</Route>
         <Route path="status" element={<Status />} />
 	<Route path="*" element={<NotFound />} />
       </Route>

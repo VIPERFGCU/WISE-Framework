@@ -1,5 +1,6 @@
 import axios from "axios";
 import { emitError } from "../components/Toaster";
+import { getToken, clearToken } from "../lib/auth";
 
 const baseURL = import.meta.env.VITE_API_BASE_URL ?? "/";
 
@@ -19,6 +20,12 @@ function loadingStop() {
 
 api.interceptors.request.use((config) => {
 	loadingStart();
+	const tok = getToken();
+	if (tok) {
+		config.headers = config.headers ?? {};
+		(config.headers as any).Authorization = `Bearer ${tok}`;
+		(config.withCredentials as any) = false; //using token header for now
+	}
 	return config;
 });
 api.interceptors.response.use(
@@ -28,6 +35,12 @@ api.interceptors.response.use(
 	},
 	(err) => {
 		loadingStop();
+		if (err?.response?.status === 401) {
+			clearToken();
+			if (location.pathname !== "/login") {
+				location.assign("/login");
+			}
+		}
 		const msg = 
 			err?.response?.data?.detail ||
 			err?.message ||

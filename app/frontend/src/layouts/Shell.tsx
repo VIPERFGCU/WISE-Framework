@@ -1,9 +1,23 @@
-import { Link, NavLink, Outlet } from "react-router-dom";
+import { Link, NavLink, Outlet, useNavigate } from "react-router-dom";
+import { isAuthed, clearToken } from "../lib/auth";
 import { Toaster } from "../components/Toaster";
 import TopLoader from "../components/TopLoader";
 import ErrorBoundary from "../components/ErrorBoundary";
 
 export default function Shell() {
+	const nav = useNavigate();
+	const authed = isAuthed();
+	function doLogout() {
+		clearToken();
+		nav("/login", {replace: true });
+	}
+
+       	// Shared sidebar link style (same for all items)
+ 	const navLinkClass = ({ isActive }: { isActive: boolean }) =>
+   		"block px-3 py-2 rounded " +
+   		(isActive ? "bg-gray-100 font-medium" : "hover:bg-gray-50");
+
+
   return (
     <div className="min-h-screen flex bg-gray-50">i
       
@@ -18,21 +32,11 @@ export default function Shell() {
           <div className="text-xs text-gray-500">Frontend</div>
         </div>
         <nav className="p-2 space-y-1 text-sm">
-          <NavLink to="/" end className={({isActive}) =>
-            `block px-3 py-2 rounded ${isActive ? "bg-gray-100 font-medium" : "hover:bg-gray-50"}`
-          }>Dashboard</NavLink>
-          <NavLink to="/devices" className={({isActive}) =>
-            `block px-3 py-2 rounded ${isActive ? "bg-gray-100 font-medium" : "hover:bg-gray-50"}`
-          }>Devices</NavLink>
-          <NavLink to="/streams" className={({isActive}) =>
-            `block px-3 py-2 rounded ${isActive ? "bg-gray-100 font-medium" : "hover:bg-gray-50"}`
-          }>Streams</NavLink>
-          <NavLink to="/admin" className={({isActive}) =>
-            `block px-3 py-2 rounded ${isActive ? "bg-gray-100 font-medium" : "hover:bg-gray-50"}`
-          }>Admin</NavLink>
-          <NavLink to="/status" className={({isActive}) =>
-            `block px-3 py-2 rounded ${isActive ? "bg-gray-100 font-medium" : "hover:bg-gray-50"}`
-          }>Status</NavLink>
+          <NavLink to="/" end className={navLinkClass}>Dashboard</NavLink>
+          <NavLink to="/devices" className={navLinkClass}>Devices</NavLink>
+          <NavLink to="/streams" className={navLinkClass}>Streams</NavLink>
+	  <NavLink to={isAuthed() ? "/admin" : "/login"} className={navLinkClass}>Admin</NavLink>
+	  <NavLink to="/status" className={navLinkClass}>Status</NavLink>
         </nav>
       </aside>
 
@@ -43,6 +47,17 @@ export default function Shell() {
           <div className="text-sm text-gray-500">v0.1</div>
         </header>
         <main className="p-4">
+		<div className="flex justify-end mb-3">
+			{authed ? (
+				<button onClick={doLogout} className="text-sm-border rounded px-3 py-1 bg-white hover:bg-gray-50">
+					Logout
+				</button>
+			) : (
+				<Link to="/login" className="text-sm border rounded px-3 py-1 bg-white hover:bg-gray-50">
+					Login
+				</Link>
+			)}
+		</div>
           <Outlet />
         </main>
       </div>
