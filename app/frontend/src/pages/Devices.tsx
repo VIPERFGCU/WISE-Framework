@@ -18,6 +18,13 @@ export default function Devices() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  const btn = [
+	"px-3 py-1.5 text-xs rounded border border-blue-500 text-blue-600 bg-blue-50",
+  	"hover:bg-blue-100 hover:text-blue-700 hover:shadow-sm active:bg-blue-200",
+  	"disabled:opacity-60 whitespace-nowrap w-24 text-center font-medium",
+  	"transition-colors duration-150",
+  ].join(" ");
+
   // per-row action loading states
   const [recBusy, setRecBusy] = useState<Record<string, boolean>>({});
   const [senseBusy, setSenseBusy] = useState<Record<string, boolean>>({});
@@ -218,11 +225,15 @@ export default function Devices() {
                   <td className="px-3 py-2"><BoolPill value={d.sensing} /></td>
                   <td className="px-3 py-2">{formatUptime(d.uptime_seconds)}</td>
 		  <td className="px-3 py-2">
+		  	{Number.isFinite(t) ? timeAgo(Date.now() - t) : "-"}
+			{stale && <span className="ml-2 inline-block h-2 w-2 rounded-full bg-red-500 align-middle" />}
+		  </td>
+		  <td className="px-3 py-2">
 		     <div className="flex items-center gap-2">
 		        <button
 			   onClick={() => toggleRecording(d)}
 			   disabled={!!recBusy[d.sensor_id]}
-			   className="px-2 py-1 text-xs border rounded bg-white hover:bg-gray-50 disabled:opacity-60"
+			   className={btn}
 			   title={d.recording ? "Stop recording" : "Start recording"}
 			>
 			   {recBusy[d.sensor_id] ? "..." : d.recording ? "Stop Rec" : "Start Rec"}
@@ -230,14 +241,14 @@ export default function Devices() {
 			<button
 			   onClick={() => toggleSensing(d)}
 			   disabled={!!senseBusy[d.sensor_id]}
-			   className="px-2 py1 text-xs border rounded bg-white hover:bg-gray-50 disabled:opacity-60"
+			   className={btn}
 			   title={d.sensing ? "Stop sensing" : "Start sensing"}
 			>
 			   {senseBusy[d.sensor_id] ? "..." : d.sensing ? "Stop Sense" : "Start Sense"}
 			</button>
 			<button
 				onClick={() => setDrawerFor(d)}
-				className="px-2 py-1 text-xs border rounded bg-white hover:bg-gray-50"
+				className={btn}
 				title="View details"
 			>
 				Details
@@ -260,8 +271,7 @@ export default function Devices() {
       {/* Drawer mounted at page root */}
       <DeviceDrawer device={drawerFor} onClose={() => setDrawerFor(null)} />
 
-    //Closing wrapper div
-    </div>
+    </div> //Closing wrapper div
   );
 }
 
