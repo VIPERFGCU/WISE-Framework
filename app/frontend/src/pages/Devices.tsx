@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { listDevices, setRecording, setSensing } from "../services/devices";
+import { listDevices, setRecording, setSensing, setFrequency, setBatchSize } from "../services/devices";
 import type { Device, DeviceStatus } from "../types/device";
 import StatusBadge from "../components/StatusBadge";
 import BoolPill from "../components/BoolPill";
@@ -35,6 +35,10 @@ export default function Devices() {
   const [rec, setRec] = useState<Tri>("all");
   const [sense, setSense] = useState<Tri>("all");
   const [sortKey, setSortKey] = useState<SortKey>("uptime_desc");
+  const [globalHz, setGlobalHz] = useState<string>("");
+  const [globalBatch, setGlobalBatch] = useState<string>("");
+  const [globalBusy, setGlobalBusy] = useState(false);
+
 
   // page-level "last loaded" clock
   const [lastLoadAt, setLastLoadAt] = useState<number | null>(null);
@@ -137,6 +141,67 @@ export default function Devices() {
         </div>
       </div>
 
+      {/* Global controls */}
+      <div className="bg-white border rounded p-3 flex flex-wrap items-end gap-3">
+      	<div>
+	   <label className="block test-xs text-gray-600 mb-1">
+	   	All sensors: Frequency (Hz)
+	   </label>
+	   <input
+	      value={globalHz}
+	      onChange={(e) => setGlobalHz(e.target.value)}
+	      inputMode="numeric"
+	      className="border rounded px-3 py-2 text-sm w-40"
+	      placeholder="e.g. 50"
+	   />
+	</div>
+	<div>
+	   <label className="block text-xs text-gray-600 mb-1">
+	   	All sensors: Batch size
+	   </label>
+	   <input
+	      value={globalBatch}
+	      onChange={(e) => setGlobalBatch(e.target.value)}
+	      inputMode="numeric"
+	      className="border rounded px-3 py-2 text-sm w-40"
+	      placeholder="e.g. 100"
+	   />
+	</div>
+	<button
+	   disabled={globalBusy}
+	   onClick={async () => {
+		   try {
+			   setGlobalBusy(true);
+			   const hz = Number(globalHz);
+			   const bs = Number(globalBatch);
+
+			   const tasks: Promise<void>[] = [];
+			   for (const d of devices) {
+				   if (Number.isFinite(hz) && hz > 0) {
+					   tasks.push(setFrequency(d.sensor_id, hz));
+				   }
+				   if (Number.isFinite(bs) && bs > 0) {
+					   tasks.push(setBatchSize(d.sensor_id, bs));
+				   }
+			   }
+			   if (tasks.length === 0) {
+				   emitError("Enter at least one valid value before applying.");
+			   } else {
+				   await Promise.all(tasks);
+				   await load(); //refresh devices list
+			   }
+		   } catch (e: any) {
+			   emitError(e?.message ?? "Failed to update all devices");
+		   } finally {
+			   setGlobalBusy(false);
+		   }
+	   }}
+	   className="px-3 py-2 text-sm rounded bg-black text-white disabled:opacity-60"
+	 >
+	   {globalBusy ? "Applying..." : "Apply to All"}
+	 </button>
+       </div>
+      	      
       {/* Controls */}
       <div className="bg-white border rounded p-3 grid gap-2 md:grid-cols-5">
         <input
@@ -204,6 +269,8 @@ export default function Devices() {
                 <th className="px-3 py-2">Status</th>
                 <th className="px-3 py-2">Recording</th>
                 <th className="px-3 py-2">Sensing</th>
+		<th className="px-3 py-2">Freq (Hz)</th>
+		<th className="px-3 py-2">Batch</th>
                 <th className="px-3 py-2">Up time</th>
 		<th className="px-3 py-2">Last Updated</th>
 		<th className="px-3 py-2">Actions</th>
@@ -223,14 +290,72 @@ export default function Devices() {
                   <td className="px-3 py-2"><StatusBadge status={d.status} /></td>
                   <td className="px-3 py-2"><BoolPill value={d.recording} /></td>
                   <td className="px-3 py-2"><BoolPill value={d.sensing} /></td>
-                  <td className="px-3 py-2">{formatUptime(d.uptime_seconds)}</td>
 		  <td className="px-3 py-2">
-		  	{Number.isFinite(t) ? timeAgo(Date.now() - t) : "-"}
-			{stale && <span className="ml-2 inline-block h-2 w-2 rounded-full bg-red-500 align-middle" />}
+		  	{Number.isFinite(d.sample_hz as any) ? d.sample_hz: "-"}
+		  </td>
+		  <td className="px-3 py-2">
+		     {Number.isFinite(d.batch_size as any) ? d.batch_size: "-"}
+		  </td>
+		  <td className="px-3 py-2">{formatUptime(d.uptime_seconds)}</td>
+		  <td className="px-3 py-2">
+		     {Number.isFinite(t) ? timeAgo(Date.now() - t) : "-"}
+		     {stale && (
+			     <span className="ml-2 inline-block h-2 w-2 rounded-full bg-red-500 align-middle" />
+		     )}
 		  </td>
 		  <td className="px-3 py-2">
 		     <div className="flex items-center gap-2">
 		        <button
+			   onClick={async () => {
+				   const v = window.prompt(
+					   "Set frequency (Hz)",
+					   d.sample_hz != null ? String(d.sample_hz) : ""
+				   );
+				   if (v == null) return;
+				   const hz = Number(v);
+				   if (!Number.isFinite(hz) || hz <= 0) {
+					   emitError("Enter a positive number for frequency.");
+					   return;
+				   }
+				   try {
+					   await setFrequency(d.sensor_id, hz);
+					   await load();
+				   } catch (e: any) {
+					   emitError(e?.message ?? "Failed to set frequency");
+				   }
+			   }}
+			   className={btn}
+			   title="Set sampling frequency"
+			>
+				Set Freq
+			</button>
+
+			<button 
+			   onClick={async () => {
+				   const v = window.prompt(
+					   "Set batch size",
+					   d.batch_size != null ? String(d.batch_size) : ""
+				   );
+				   if (v == null) return;
+				   const bs = Number(v);
+				   if (!Number.isFinite(bs) || bs <= 0) {
+					   emitError("Enter a positive integer for batch size.");
+					   return;
+				   }
+				   try {
+					   await setBatchSize(d.sensor_id, bs);
+					   await load();
+				   } catch (e: any) {
+					   emitError(e?.message ?? "Failed to set batch size");
+				   }
+			   }}
+			   className={btn}
+			   title="Set batch size"
+			>
+				Set Batch
+			</button>
+
+		     	<button
 			   onClick={() => toggleRecording(d)}
 			   disabled={!!recBusy[d.sensor_id]}
 			   className={btn}

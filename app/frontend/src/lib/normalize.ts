@@ -25,6 +25,16 @@ export function normalizeDevice(raw: any): Device {
     sensing: Boolean(raw?.sensing ?? raw?.is_sensing ?? raw?.sense),
     uptime_seconds: Number(raw?.uptime_seconds ?? raw?.uptime ?? 0),
     updated_at: raw?.updated_at ?? raw?.last_seen ?? undefined,
+    sample_hz:
+	    raw?.sample_hz ??
+	    raw?.rate_hz ??
+	    raw?.frequency_hz ??
+	    raw?.freq ??
+	    undefined,
+    batch_size:
+	    raw?.batch_size ??
+	    raw?.batch ??
+	    undefined,
   };
 }
 
