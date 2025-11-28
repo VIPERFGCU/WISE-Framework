@@ -1,12 +1,20 @@
 # app/api/v1/control.py
 from fastapi import APIRouter, Depends, HTTPException, status
+from pydantic import BaseModel
 from app import deps
 import os, json, paho.mqtt.client as mqtt
+
 
 router = APIRouter(prefix="/api/devices", tags=["control"])
 
 MQTT_HOST = os.getenv("MQTT_HOST", "mosquitto")
 MQTT_PORT = int(os.getenv("MQTT_PORT", "1883"))
+
+class RateUpdate(BaseModel):
+    rate_hz: int
+
+class BatchUpdate(BaseModel):
+    batch_size: int
 
 def _publish_control(device_id: str, payload: dict) -> None:
     """
@@ -56,3 +64,38 @@ async def stop_device(device_id: str):
         raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY,
                             detail=f"MQTT publish failed: {type(e).__name__}: {e}")
 
+@router.post(
+        "/{device_id}/rate",
+        dependencies=[Depends(deps.require_api_key_or_role("admin"))],
+)
+async def set_device_rate(device_id: str, body: RateUpdate):
+    """
+    Update the sampling frequency (Hz) for a single device.
+    Sends: {"cmd": "SET_RATE", "rate_hz": <int>}
+    """
+    try:
+        _publish_control(device_id, {"cmd": "SET_RATE", "rate_hz": int(body.rate_hz)})
+        return {"ok": True}
+    except Exception as e:
+        raise HTTPException(
+                status_code=status.HTTP_502_BAD_GATEWAY,
+                detail=f"MQTT publish failed: {type(e).__name__}: {e}",
+            )
+
+@router.post(
+        "/{device_id}/batch",
+        dependencies=[Depends(deps.require_api_key_or_role("admin"))],
+)
+async def set_device_batch(device_id: str, body: BatchUpdate):
+    """
+    Update the batch size (samples per publish) for a single device.
+    Sends: {"cmd": "SET_BATCH", "batch_size": <int>}
+    """
+    try:
+        _publish_control(device_id, {"cmd": "SET_BATCH", "batch_size": int(body.batch_size)})
+        return {"ok": True}
+    except Exception as e:
+        raise HTTPException(
+                status_code=status.HTTP_502_BAD_GATEWAY,
+                detail=f"MQTT publish failed: {type(e).__name__}: {e}",
+            )
