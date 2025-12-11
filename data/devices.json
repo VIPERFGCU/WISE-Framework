@@ -4,5 +4,11 @@
     "label": "Test",
     "notes": "Test",
     "last_seen": null
+  },
+  "esp32_37d5a8": {
+    "device_id": "esp32_37d5a8",
+    "label": "ESP32 Sensor",
+    "notes": null,
+    "last_seen": null
   }
 }
