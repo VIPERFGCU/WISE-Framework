@@ -1,6 +1,6 @@
 export default function Streams() {
   // Grafana iframe URL
-  const grafanaUrl = "<iframe src=\"http://localhost:4000/d-solo/adszfxv/wisenet-dashboard?orgId=1&timezone=browser&tab=queries&panelId=1&__feature.dashboardSceneSolo=true&kiosk";
+  const grafanaUrl = "http://localhost:4000/d-solo/adszfxv/wisenet-dashboard?orgId=1&timezone=browser&tab=queries&panelId=1&__feature.dashboardSceneSolo=true&kiosk";
 
 
 return (
