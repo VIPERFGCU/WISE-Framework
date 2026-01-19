@@ -79,15 +79,18 @@ async def debug_start_sensor(device_id: str = "bridge-esp32-001"):
     payload = json.dumps({"cmd": "START", "rate_hz": 10})
     topic = f"devices/{device_id}/control"
 
+    if not mqtt_client.is_connected():
+        log.error("[Debug] MQTT client is not connected to broker")
+        return {"status": "error", "message": "MQTT disconnected"}
+
     try:
-        # First checking if our global client is actually connected
-        if mqtt_client.is_connected():
-            mqtt_client.publish(topic, payload)
-            log.info(f"[Debug] Sent START command to {topic}")
-            return {"status": "command sent", "topic": topic}
-        else:
-            log.error(f"[Debug] MQTT global client is NOT connected")
-            return {"status": "error", "topic": "MQTT client disconnected"}
+        # Publish using the globally connected client
+        result = mqtt_client.publish(topic, payload, qos=1)
+        # block for a tiny bit to ensure it actually leaves the internal buffer
+        result.wait_for_publish(timeout=1.0)
+
+        log.info(f"[Debug] Sent START command to {topic}")
+        return {"status": "command sent", "topic": topic}
     except Exception as e:
             # Catching any unexpected issues during the publish process
             log.error(f"[Debug] Failed to publish START command: {e}")
@@ -145,11 +148,13 @@ def _paho_on_message(client, userdata, msg):
 
 def _mqtt_thread():
     global mqtt_client
+    mqtt_client.on_connect = _paho_on_connect
+    mqtt_client.on_message = _paho_on_message
     while True:
         try:
-            mqtt_client.on_connect = _paho_on_connect
-            mqtt_client.on_message = _paho_on_message
-            mqtt_client.connect(MQTT_HOST, MQTT_PORT, keepalive=30)
+            # Connect using the internal Docker name
+            mqtt_client.connect(MQTT_HOST, MQTT_PORT, keepalive=60)
+            # loop_forever handles reconnections automatically
             mqtt_client.loop_forever()
         except Exception as e:
             log.warning(f"[MQTT] Thread error: {type(e).__name__}: {e}; retrying in 2s")
