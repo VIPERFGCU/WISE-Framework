@@ -10,6 +10,7 @@ from starlette.responses import Response
 from influxdb_client import Point, WritePrecision
 from influxdb_client.client.write_api import SYNCHRONOUS
 from paho.mqtt import client as paho
+mqtt_client = paho.Client(paho.CallbackAPIVersion.VERSION2)
 
 from app.api.v1 import devices, ingest, query, health, control, preview
 from app.core.config import settings
@@ -79,16 +80,18 @@ async def debug_start_sensor(device_id: str = "bridge-esp32-001"):
     topic = f"devices/{device_id}/control"
 
     try:
-        # Connecting a temporary client to publish the message
-        temp_client = paho.Client(paho.CallbackAPIVersion.VERSION2)
-        temp_client.connect("mosquitto", 1883)
-        temp_client.publish(topic, payload)
-        temp_client.disconnect()
-        log.info(f"[Debug] Sent START command to {topic}")
-        return {"status": "command send", "topic": topic}
+        # First checking if our global client is actually connected
+        if mqtt_client.is_connected():
+            mqtt_client.publish(topic, payload)
+            log.info(f"[Debug] Sent START command to {topic}")
+            return {"status": "command sent", "topic": topic}
+        else:
+            log.error(f"[Debug] MQTT global client is NOT connected")
+            return {"status": "error", "topic": "MQTT client disconnected"}
     except Exception as e:
-        log.error(f"[Debug] Failed to send START command: {e}")
-        return {"status": "error", "message": str(e)}
+            # Catching any unexpected issues during the publish process
+            log.error(f"[Debug] Failed to publish START command: {e}")
+            return {"status": "error", "message": str(e)}
 
 # -------------------------------------------------------------------
 # WebSocket broadcast hub (simple in-memory)
@@ -141,13 +144,13 @@ def _paho_on_message(client, userdata, msg):
         log.warning(f"[MQTT] Queue put failed: {type(e).__name__}: {e}")
 
 def _mqtt_thread():
+    global mqtt_client
     while True:
         try:
-            client = paho.Client(paho.CallbackAPIVersion.VERSION2)
-            client.on_connect = _paho_on_connect
-            client.on_message = _paho_on_message
-            client.connect(MQTT_HOST, MQTT_PORT, keepalive=30)
-            client.loop_forever()
+            mqtt_client.on_connect = _paho_on_connect
+            mqtt_client.on_message = _paho_on_message
+            mqtt_client.connect(MQTT_HOST, MQTT_PORT, keepalive=30)
+            mqtt_client.loop_forever()
         except Exception as e:
             log.warning(f"[MQTT] Thread error: {type(e).__name__}: {e}; retrying in 2s")
             time.sleep(2)
