@@ -111,7 +111,7 @@ async def stream(ws: WebSocket):
 # -------------------------------------------------------------------
 # MQTT Consumer -> InfluxDB + WebSocket fan-out
 # -------------------------------------------------------------------
-MQTT_HOST = os.getenv("MQTT_HOST", "mosquitto")
+MQTT_HOST = os.getenv("MQTT_HOST", "10.0.0.155")
 MQTT_PORT = int(os.getenv("MQTT_PORT", "1883"))
 MQTT_TOPIC = os.getenv("MQTT_TOPIC", "devices/+/data")
 INFLUX_BUCKET = settings.influx_bucket

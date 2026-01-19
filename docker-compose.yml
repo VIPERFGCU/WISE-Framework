@@ -20,6 +20,8 @@ services:
       --port 8000
       --reload
     restart: unless-stopped
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
   
   frontend:
     build:
