@@ -88,7 +88,7 @@ async def debug_start_sensor(device_id: str = "bridge-esp32-001"):
         return {"status": "command send", "topic": topic}
     except Exception as e:
         log.error(f"[Debug] Failed to send START command: {type(e).__name__}: {e}")
-        return {"status": "error", "detail": str(e)}
+        return {"status": "error", "message": str(e)}
 
 # -------------------------------------------------------------------
 # WebSocket broadcast hub (simple in-memory)
