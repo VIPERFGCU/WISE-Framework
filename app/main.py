@@ -67,6 +67,30 @@ app.include_router(control.router)
 app.include_router(preview.router)
 
 # -------------------------------------------------------------------
+# Debug / Manual Control
+# -------------------------------------------------------------------
+@app.post("api/v1/debug/start")
+async def debug_start_sensor(device_id: str = "bridge-esp32-001"):
+    """
+    Manually triggers the sensor to start via the backend's MQTT logic.
+    This effectively tells the ESP32 to set 'streaming = true'.
+    """
+    payload = json.dumps({"cmd": "START", "rate_hz": 10})
+    topic = f"devices/{device_id}/control"
+
+    try:
+        # Connecting a temporary client to publish the message
+        temp_client = paho.Client(paho.CallbackAPIVersion.VERSION2)
+        temp_client.connect(MQTT_HOST, MQTT_PORT)
+        temp_client.publish(topic, payload)
+        temp_client.disconnect()
+        log.info(f"[Debug] Sent START command to {topic}")
+        return {"status": "command send", "topic": topic}
+    except Exception as e:
+        log.error(f"[Debug] Failed to send START command: {type(e).__name__}: {e}")
+        return {"status": "error", "detail": str(e)}
+
+# -------------------------------------------------------------------
 # WebSocket broadcast hub (simple in-memory)
 # -------------------------------------------------------------------
 active_clients: Set[WebSocket] = set()
