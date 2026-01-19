@@ -14,6 +14,8 @@ from paho.mqtt import client as paho
 from app.api.v1 import devices, ingest, query, health, control, preview
 from app.core.config import settings
 from app.deps import get_influx_client
+from app.services.influx import write_accel_point
+from app.schemas.sensor import SensorReading
 
 # -------------------------------------------------------------------
 # App setup
@@ -154,16 +156,17 @@ async def _drain_mqtt_queue():
 
         # ---- try Influx, but never block WS on failure ----
         try:
-            client_influx = get_influx_client()
-            if client_influx:
-                write_api = client_influx.write_api(write_options=SYNCHRONOUS)
-                p = (Point("sensor_data")
-                     .tag("device_id", device_id)
-                     .field("x", float(data["x"]))
-                     .field("y", float(data["y"]))
-                     .field("z", float(data["z"]))
-                     .time(ts, WritePrecision.NS))
-                write_api.write(bucket=INFLUX_BUCKET, record=p)
+            # 1 . Creating the schema object required by write_accel_point
+            reading = SensorReading(
+                device_id=device_id,
+                x=float(data.get("x", 0)),
+                y=float(data.get("y", 0)),
+                z=float(data.get("z", 0)),
+            )
+
+            # 2. Calling async service function
+            await write_accel_point(reading, ts)
+            log.info(f"[Influx] write succeeded: device_id={device_id} ts={ts.isoformat()}")
         except Exception as e:
             log.warning(f"[Influx] write failed: {type(e).__name__}: {e}")
 
