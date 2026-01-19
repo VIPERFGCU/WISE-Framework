@@ -81,7 +81,7 @@ async def debug_start_sensor(device_id: str = "bridge-esp32-001"):
     try:
         # Connecting a temporary client to publish the message
         temp_client = paho.Client(paho.CallbackAPIVersion.VERSION2)
-        temp_client.connect(MQTT_HOST, MQTT_PORT)
+        temp_client.connect("mosquitto", 1883)
         temp_client.publish(topic, payload)
         temp_client.disconnect()
         log.info(f"[Debug] Sent START command to {topic}")
