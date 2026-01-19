@@ -69,7 +69,7 @@ app.include_router(preview.router)
 # -------------------------------------------------------------------
 # Debug / Manual Control
 # -------------------------------------------------------------------
-@app.post("api/v1/debug/start")
+@app.post("/api/v1/debug/start")
 async def debug_start_sensor(device_id: str = "bridge-esp32-001"):
     """
     Manually triggers the sensor to start via the backend's MQTT logic.
