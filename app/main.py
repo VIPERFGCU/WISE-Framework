@@ -76,25 +76,14 @@ async def debug_start_sensor(device_id: str = "bridge-esp32-001"):
     Manually triggers the sensor to start via the backend's MQTT logic.
     This effectively tells the ESP32 to set 'streaming = true'.
     """
-    payload = json.dumps({"cmd": "START", "rate_hz": 10})
-    topic = f"devices/{device_id}/control"
-
-    if not mqtt_client.is_connected():
-        log.error("[Debug] MQTT client is not connected to broker")
-        return {"status": "error", "message": "MQTT disconnected"}
-
-    try:
-        # Publish using the globally connected client
-        result = mqtt_client.publish(topic, payload, qos=1)
-        # block for a tiny bit to ensure it actually leaves the internal buffer
-        result.wait_for_publish(timeout=1.0)
-
-        log.info(f"[Debug] Sent START command to {topic}")
-        return {"status": "command sent", "topic": topic}
+    try: 
+        # Using the unified function
+        _publish_control(device_id, {"cmd": "START", "rate_hz": 10})
+        log.info(f"[Debug] Sent START command to {device_id}")
+        return {"status": "command sent", "device": device_id}
     except Exception as e:
-            # Catching any unexpected issues during the publish process
-            log.error(f"[Debug] Failed to publish START command: {e}")
-            return {"status": "error", "message": str(e)}
+        log.error(f"[Debug] Failed: {e}")
+        return {"status": "error", "message": str(e)}
 
 # -------------------------------------------------------------------
 # WebSocket broadcast hub (simple in-memory)

@@ -2,6 +2,7 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel
 from app import deps
+from app.main import mqtt_client # Importing the global client
 import os, json, paho.mqtt.client as mqtt
 
 
@@ -24,20 +25,18 @@ def _publish_control(device_id: str, payload: dict) -> None:
     """
     topic = f"devices/{device_id}/control"
 
-    cli = mqtt.Client(client_id="backend-control-pub", clean_session=True)
-    # If your broker requires auth, set it here:
-    # cli.username_pw_set(os.getenv("MQTT_USER",""), os.getenv("MQTT_PASS",""))
-
-    cli.connect(MQTT_HOST, MQTT_PORT, keepalive=20)
-    cli.loop_start()
+    # Checking if global client from main.py is connected
+    if not mqtt_client.is_connected():
+        raise Exception("Global MQTT client is not connected to broker")
+    
     try:
         payload_str = json.dumps(payload)
-        # Publish with QoS 1 so ESP32 definitely gets it even with brief Wi-Fi jitter
-        info = cli.publish(topic, payload_str, qos=1, retain=False)
-        info.wait_for_publish(timeout=2.0)
-    finally:
-        cli.loop_stop()
-        cli.disconnect()
+        # Use the persistent global client to publish
+        info = mqtt_client.publish(topic, payload_str, qos=1)
+        # Confirm it actually left the buffer
+        info.wait_for_publish(timeout=1.0)
+    except Exception as e:
+        raise e
 
 @router.post(
     "/{device_id}/start",
