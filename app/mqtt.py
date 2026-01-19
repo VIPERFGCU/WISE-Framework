@@ -1,6 +1,6 @@
 # app/mqtt.py
 import paho.mqtt.client as paho
-import logging
+import logging, json
 
 log = logging.getLogger("sensor-backend")
 
@@ -8,7 +8,6 @@ log = logging.getLogger("sensor-backend")
 mqtt_client = paho.Client(paho.CallbackAPIVersion.VERSION2)
 
 def publish_control(device_id: str, payload: dict) -> bool:
-    import json
     topic = f"devices/{device_id}/control"
     
     if not mqtt_client.is_connected():

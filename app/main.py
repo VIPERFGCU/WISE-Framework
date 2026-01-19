@@ -10,13 +10,13 @@ from starlette.responses import Response
 from influxdb_client import Point, WritePrecision
 from influxdb_client.client.write_api import SYNCHRONOUS
 from paho.mqtt import client as paho
-mqtt_client = paho.Client(paho.CallbackAPIVersion.VERSION2)
 
 from app.api.v1 import devices, ingest, query, health, control, preview
 from app.core.config import settings
 from app.deps import get_influx_client
 from app.services.influx import write_accel_point
 from app.schemas.sensor import SensorReading
+from app.mqtt import mqtt_client, publish_control
 
 # -------------------------------------------------------------------
 # App setup
@@ -131,7 +131,6 @@ def _paho_on_message(client, userdata, msg):
         log.warning(f"[MQTT] Queue put failed: {type(e).__name__}: {e}")
 
 def _mqtt_thread():
-    global mqtt_client
     mqtt_client.on_connect = _paho_on_connect
     mqtt_client.on_message = _paho_on_message
     while True:

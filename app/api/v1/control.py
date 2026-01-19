@@ -2,15 +2,12 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel
 from app import deps
-from app.main import mqtt_client # Importing the global client
 from app.mqtt import publish_control 
 import os, json, paho.mqtt.client as mqtt
 
 
 router = APIRouter(prefix="/api/devices", tags=["control"])
 
-MQTT_HOST = os.getenv("MQTT_HOST", "mosquitto")
-MQTT_PORT = int(os.getenv("MQTT_PORT", "1883"))
 
 class RateUpdate(BaseModel):
     rate_hz: int
@@ -24,7 +21,6 @@ async def start_device(device_id: str, body: dict = None):
     if publish_control(device_id, {"cmd": "START", "rate_hz": int(rate_hz)}):
         return {"ok": True}
     raise HTTPException(status_code=502, detail="MQTT publish failed")
-
 
 @router.post("/{device_id}/stop")
 async def stop_device(device_id: str):
