@@ -19,6 +19,16 @@
 #define PI_IP_ADDRESS "10.10.10.1"
 #define MQTT_BROKER_URL "mqtt://" PI_IP_ADDRESS ":1883"
 
+// --- OTA Packet Def ---
+#define OTA_CHUNK_SIZE 1024
+typedef struct {
+    uint8_t type;                   // 0=data, 1=OTA_START, 2=OTA_CHUNK, 3=OTA_END
+    uint32_t total_size;            //Total size of firmware.
+    uint32_t offset;                //Where this chunk belongs in the file.
+    uint16_t data_len;              // How many bytets in this chunk.
+    uint8_t data[OTA_CHUNK_SIZE];   // The firmware binary.
+} mesh_ota_packet_t;
+
 static const char *TAG = "mesh_main";
 static bool is_root = false;
 static bool mqtt_connected = false;
@@ -101,23 +111,70 @@ void data_task(void *arg) {
     }
 }
 
+
+//Theoretical Implementation for receiver logic
+void mesh_ota_receiver_logic(uint8_t *incoming_data, size_t len) {
+    mesh_ota_packet_t *packet = (mesh_ota_packet_t *)incoming_data;
+    static esp_ota_handle_t update_handle = 0;
+    static const esp_partition_t *update_partition = NULL;
+    
+    if (packet->type == 1) { // OTA START
+        ESP_LOGI(TAG, "OTA Start. Total Size: %lu", (unbsigned long)packet->total_size);
+        update_partition = esp_ota_get_next_update_partition(NULL);
+        if (update_partition == NULL) {
+            ESP_LOGE(TAG, "OTA Passive Partition not found.");
+            return;
+        }
+        ESP_ERROR_CHECK(esp_ota_begin(update_partition, OTA_SIZE_UNKNOWN, &update_handle));
+    } else if (packet->type == 2) { // OTA CHUNK
+        if (update_handle) {
+            //Write the chunk
+            esp_ota_write(update_handle, packet->data, packet->data_len);
+        }
+    } else if (packet->type == 3) { // OTA END
+        if (update_handle) {
+            esp_ota_end(update_handle);
+            esp_ota_set_boot_partition(update_partition);
+            ESP_LOGI(TAG, "OTA Update Complete. Rebooting...");
+            esp_restart();
+        }
+    }
+}
+
 // --- MESH RECEIVER (Root Only) ---
+// Modifying for Child OTA.
 void mesh_p2p_rx_task(void *arg) {
     mesh_addr_t from;
     mesh_data_t data;
     int flag = 0;
-    data.data = heap_caps_malloc(1500, MALLOC_CAP_8BIT);
+    data.data = heap_caps_malloc(1500, MALLOC_CAP_8BIT);    //Buffer size.
     while (1) {
         data.size = 1500;
+        // Listen for any packet.
         if (esp_mesh_recv(&from, &data, portMAX_DELAY, &flag, NULL, 0) == ESP_OK) {
-            data.data[data.size] = 0;
-            if (is_root && mqtt_connected) {
-                esp_mqtt_client_publish(mqtt_client, "mesh/data", (char *)data.data, 0, 0, 0);
-                ESP_LOGI(TAG, "ROOT FWD: %s", (char *)data.data);
+            
+            //Peek at first byte to check type.
+            uint8_t packet-type = data.data[0];
+
+            if (packet_type >= 1 && packet_type <= 3){
+                //It is an OTA packet
+                //Pass to helper function
+                mesh_ota_receiver_logic(data.data, data.size);
+            }
+            else {
+                // Sensor Data, forward to MQTT
+                            data.data[data.size] = 0;
+                if (is_root && mqtt_connected) {
+                    esp_mqtt_client_publish(mqtt_client, "mesh/data", (char *)data.data, 0, 0, 0);
+                    ESP_LOGI(TAG, "ROOT FWD: %s", (char *)data.data);
+                } else {
+                    ESP_LOGI(TAG, "RX Data: %s", (char *)data.data);
+                }
             }
         }
     }
     vTaskDelete(NULL);
+
 }
 
 // --- MESH EVENT HANDLER ---
@@ -167,6 +224,69 @@ void mesh_event_handler(void *arg, esp_event_base_t event_base, int32_t event_id
         break;
     default: break;
     }
+}
+
+
+// Theoretical Root Broadcaster Implementation
+/* 
+Called by root after it finishes its own OTA download.
+It reads the firmware from the partition it just wrote to and broadcasts it.
+*/
+void broadcast_ota_to_mesh() {
+    ESP_LOGI(TAG, "Starting Mesh OTA Distribution...");
+    const esp_partition_t *update_partition = esp_ota_get_next_update_partition(NULL);
+    //Or we send the partition we are currently running on.
+    //const esp_partition_t *update_partition = esp_ota_get_running_partition();
+    
+    mesh_ota_packet_t packet;
+    packet.type = 1; //OTA START
+    packet.total_size = update_partition->size; // Size of the partition/file
+    packet.offset = 0;
+    
+    //1. Send Start Command
+    mesh_data_t mesh_data = {
+        .data = (uint8_t *)&packet,
+        .size = sizeof(packet),
+        .proto = MESH_PROTO_BIN,
+        .tos = MESH_TOS_P2P,
+    };
+
+    // Use esp_mesh_send with NULL address for BROADCAST --- Send to all children.
+    esp_mesh_send(NULL, &mesh_data, MESH_DATA_P2P | MESH_DATA_TODS, NULL, 0);
+    vTaskDelay(pdMS_TO_TICKS(1000));   //Delay for children to delete partitions.
+
+    // 2. Loop through firmware and send chunks.
+    uint32_t offset = 0;
+    packet.type = 2; //OTA CHUNK
+
+    while (offset < update_partition->size) {
+        // Read flash
+        esp_partition_read(update_partition, offset, packet.data, OTA_CHUNK_SIZE);
+        packet.offset = offset;
+        packet.data_len = OTA_CHUNK_SIZE; // Handle last chunk size logic
+
+        mesh_data.size = sizeof(mesh_ota_packet_t);     // Update size
+        
+        //Send to mesh
+        esp_err_t err = esp_mesh_send(NULL, &mesh_data, MESH_DATA_P2P | MESH_DATA_TODS, NULL, 0);
+
+        if (err != ESP_OK) {
+            //MESH can get congested.
+            vTaskDelay(pdMS_TO_TICKS(100));
+        } else {
+            offset += OTA_CHUNK_SIZE;
+        }
+
+        // An attempt to prevent mesh flooding
+        vTaskDelay(pdMS_TO_TICKS(50));
+    }
+
+    //3. Send End Command
+    packet.type = 3; //OTA END
+    mesh_data.size = sizeof(packet);
+    esp_mesh_send(NULL, &mesh_data, MESH_DATA_P2P | MESH_DATA_TODS, NULL, 0);
+
+    ESP_LOGI(TAG, "OTA Distribution Complete!");
 }
 
 void app_main(void) {
