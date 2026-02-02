@@ -33,7 +33,7 @@ services:
     networks:
       - wisenet-network
     ports:
-      - "8080:80"
+      - "5173:80"
     depends_on:
       - api
     restart: unless-stopped
@@ -64,6 +64,8 @@ services:
   mosquitto:
     image: eclipse-mosquitto:2
     container_name: mosquitto
+    networks:
+      - wisenet-network 
     ports:
       - "1883:1883"
     volumes:
