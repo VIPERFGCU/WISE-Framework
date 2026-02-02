@@ -12,3 +12,7 @@ class DeviceOut(BaseModel):
     label: Optional[str] = None
     last_seen: Optional[datetime] = None
     status: str
+    sensing: bool = False
+    sample_hz: Optional[int] = None
+    batch_size: Optional[int] = None
+    uptime_seconds: Optional[int] = None

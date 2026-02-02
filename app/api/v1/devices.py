@@ -27,22 +27,33 @@ MQTT_HOST = os.getenv("MQTT_HOST", "localhost")
 MQTT_PORT = int(os.getenv("MQTT_PORT", "1883"))
 _STATUS_SUB = "devices/+/status"
 
-def _deviceout_from_cache(device_id: str) -> DeviceOut:
+def _deviceout_from_cache(device_id: str, rec=None) -> DeviceOut:
+    """Build a DeviceOut using the MQTT cache snapshot (non-blocking).
+
+    If a service `rec` is provided, prefer its `label` and `last_seen` values
+    while still sourcing live telemetry fields from the MQTT cache.
+    """
     with _cache_lock:
         c = _mqtt_status_cache.get(device_id)
-    
-    # Determine sensing state from cached state ("streaming" = sensing)
+
     sensing = (c.get("state") == "streaming") if c else False
-    
+    label = (rec.label if rec and getattr(rec, "label", None) else device_id)
+    last_seen = None
+    # Prefer service-observed last_seen when available, else use cache ts
+    if rec and getattr(rec, "last_seen", None):
+        last_seen = rec.last_seen
+    else:
+        last_seen = c.get("ts") if c else None
+
     return DeviceOut(
         device_id=device_id,
-        label=device_id,  # fallback label
-        last_seen=c.get("ts") if c else None,
+        label=label,
+        last_seen=last_seen,
         status=(c.get("state") if c else "unknown"),
         sensing=sensing,
-        sample_hz=c.get("rate_hz") if c else None,
-        batch_size=c.get("batch_size") if c else None,
-        uptime_seconds=c.get("uptime_s", 0) if c else 0,
+        sample_hz=(c.get("rate_hz") if c else None),
+        batch_size=(c.get("batch_size") if c else None),
+        uptime_seconds=(c.get("uptime_s", 0) if c else 0),
     )
 
 
@@ -108,13 +119,8 @@ def _cached_status_detail(device_id: str) -> Dict[str, Any]:
 )
 async def register_device(payload: DeviceCreate) -> DeviceOut:
     rec = svc.register(device_id=payload.device_id, label=payload.label, notes=payload.notes)
-    live_state = _merged_status(rec.device_id, svc.status(rec))
-    return DeviceOut(
-        device_id=rec.device_id,
-        label=rec.label,
-        last_seen=rec.last_seen,
-        status=live_state,
-    )
+    # Return a DeviceOut enriched with non-blocking cached telemetry when available
+    return _deviceout_from_cache(rec.device_id, rec)
 
 @router.get(
     "",
@@ -126,13 +132,7 @@ async def list_devices() -> List[DeviceOut]:
     
     out: List[DeviceOut] = []
     for rec in svc.all_devices():
-        live_state = _merged_status(rec.device_id, svc.status(rec))
-        out.append(DeviceOut(
-            device_id=rec.device_id,
-            label=rec.label,
-            last_seen=rec.last_seen,
-            status=live_state,
-        ))
+        out.append(_deviceout_from_cache(rec.device_id, rec))
     out.sort(key=lambda d: d.device_id)
     return out
 
@@ -146,13 +146,7 @@ async def get_device(device_id: str) -> DeviceOut:
     rec = svc.get(device_id)
     if not rec:
         raise HTTPException(status_code=404, detail="Device not found")
-    live_state = _merged_status(rec.device_id, svc.status(rec))
-    return DeviceOut(
-        device_id=rec.device_id,
-        label=rec.label,
-        last_seen=rec.last_seen,
-        status=live_state,
-    )
+    return _deviceout_from_cache(rec.device_id, rec)
 
 # ----------------------------
 # New: explicit live status endpoint for the UI
