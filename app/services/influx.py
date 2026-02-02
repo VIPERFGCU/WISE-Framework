@@ -42,6 +42,24 @@ async def write_accel_point(reading: SensorReading, ts: datetime) -> datetime:
     except Exception as e:
         # If the persistent write fails, it is usually a network/auth issue
         raise e
+
+def write_accel_point_sync(reading: SensorReading, ts: datetime) -> datetime:
+    """Synchronous wrapper for writing a single accel point.
+    Useful when calls must be offloaded to a thread.
+    """
+    try:
+        p = (
+            Point("accel")
+            .tag("device_id", reading.device_id)
+            .field("x", float(reading.x))
+            .field("y", float(reading.y))
+            .field("z", float(reading.z))
+            .time(ts, WritePrecision.NS)
+        )
+        _write_api.write(bucket=settings.influx_bucket, record=p)
+        return ts
+    except Exception as e:
+        raise e
 # queries
 
 async def read_accel_series(

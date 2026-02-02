@@ -108,20 +108,12 @@ def _cached_status_detail(device_id: str) -> Dict[str, Any]:
 )
 async def register_device(payload: DeviceCreate) -> DeviceOut:
     rec = svc.register(device_id=payload.device_id, label=payload.label, notes=payload.notes)
-    # Merge MQTT live state with service-derived status
     live_state = _merged_status(rec.device_id, svc.status(rec))
-    with _cache_lock:
-        cached = _mqtt_status_cache.get(rec.device_id)
-    sensing = (cached.get("state") == "streaming") if cached else False
     return DeviceOut(
         device_id=rec.device_id,
         label=rec.label,
         last_seen=rec.last_seen,
         status=live_state,
-        sensing=sensing,
-        sample_hz=cached.get("rate_hz") if cached else None,
-        batch_size=cached.get("batch_size") if cached else None,
-        uptime_seconds=cached.get("uptime_s", 0) if cached else 0,
     )
 
 @router.get(
@@ -131,35 +123,16 @@ async def register_device(payload: DeviceCreate) -> DeviceOut:
 )
 async def list_devices() -> List[DeviceOut]:
     _ensure_mqtt_started()  # make sure cache is live
-
-    # 1) DB-registered devices
+    
     out: List[DeviceOut] = []
-    have: set[str] = set()
     for rec in svc.all_devices():
         live_state = _merged_status(rec.device_id, svc.status(rec))
-        with _cache_lock:
-            cached = _mqtt_status_cache.get(rec.device_id)
-        sensing = (cached.get("state") == "streaming") if cached else False
         out.append(DeviceOut(
             device_id=rec.device_id,
             label=rec.label,
             last_seen=rec.last_seen,
             status=live_state,
-            sensing=sensing,
-            sample_hz=cached.get("rate_hz") if cached else None,
-            batch_size=cached.get("batch_size") if cached else None,
-            uptime_seconds=cached.get("uptime_s", 0) if cached else 0,
         ))
-        have.add(rec.device_id)
-
-    # 2) Any devices seen via retained MQTT status but not registered
-    with _cache_lock:
-        cached_ids = list(_mqtt_status_cache.keys())
-    for did in cached_ids:
-        if did not in have:
-            out.append(_deviceout_from_cache(did))
-
-    # Optional: sort by device_id for stable UI
     out.sort(key=lambda d: d.device_id)
     return out
 
@@ -174,18 +147,11 @@ async def get_device(device_id: str) -> DeviceOut:
     if not rec:
         raise HTTPException(status_code=404, detail="Device not found")
     live_state = _merged_status(rec.device_id, svc.status(rec))
-    with _cache_lock:
-        cached = _mqtt_status_cache.get(rec.device_id)
-    sensing = (cached.get("state") == "streaming") if cached else False
     return DeviceOut(
         device_id=rec.device_id,
         label=rec.label,
         last_seen=rec.last_seen,
         status=live_state,
-        sensing=sensing,
-        sample_hz=cached.get("rate_hz") if cached else None,
-        batch_size=cached.get("batch_size") if cached else None,
-        uptime_seconds=cached.get("uptime_s", 0) if cached else 0,
     )
 
 # ----------------------------

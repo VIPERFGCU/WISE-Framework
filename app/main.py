@@ -150,25 +150,31 @@ def _mqtt_thread():
     connection_event = threading.Event()
     _paho_on_connect._event = connection_event  # type: ignore
     set_connection_event(connection_event)
-    
+
     mqtt_client.on_connect = _paho_on_connect
     mqtt_client.on_message = _paho_on_message
+
+    # Attempt connect and use a non-blocking loop so FastAPI is not blocked
+    try:
+        log.info(f"[MQTT] Attempting connection to {MQTT_HOST}:{MQTT_PORT}")
+        mqtt_client.connect_async(MQTT_HOST, MQTT_PORT, keepalive=60)
+        # Use loop_start() to run network loop in background thread
+        mqtt_client.loop_start()
+    except Exception as e:
+        log.warning(f"[MQTT] Initial connect failed: {e}")
+
+    # Keep the thread alive (loop_start handles MQTT I/O)
     while True:
-        try:
-            log.info(f"[MQTT] Attempting connection to {MQTT_HOST}:{MQTT_PORT}")
-            # Connect using the internal Docker name
-            mqtt_client.connect_async(MQTT_HOST, MQTT_PORT, keepalive=60)
-            # loop_forever handles reconnections automatically
-            mqtt_client.loop_forever()
-        except Exception as e:
-            log.warning(f"[MQTT] Thread error: {type(e).__name__}: {e}; retrying in 2s")
-            connection_event.clear()
-            time.sleep(2)
+        time.sleep(1)
 
 # -------------------------------------------------------------------
 # MQTT Consumer -> InfluxDB + WebSocket fan-out
 # -------------------------------------------------------------------
 async def _drain_mqtt_queue():
+    """Consume messages placed on the thread-safe queue by the Paho callbacks.
+    Only `/data` topics are parsed as `SensorReading` to avoid validation errors
+    for `status` or `control` messages which have different schemas.
+    """
     while True:
         try:
             topic, payload_raw = _mqtt_queue.get_nowait()
@@ -177,25 +183,36 @@ async def _drain_mqtt_queue():
             continue
 
         try:
+            # Only process sensor data messages
+            if not topic.endswith("/data"):
+                log.debug(f"[MQTT] Ignoring non-data message on {topic}")
+                continue
+
             data = json.loads(payload_raw)
-            
+
             # 1. Parse device_id from topic (devices/bridge-esp32-001/data)
             parts = topic.split("/")
             device_from_topic = parts[1] if len(parts) >= 2 else "unknown"
-            
+
             # 2. Force the device_id into the data dict for Pydantic validation
             data["device_id"] = data.get("device_id") or device_from_topic
-            
+
             ts_str = data.get("ts")
             ts = (datetime.fromisoformat(ts_str.replace("Z", "+00:00"))
                   if ts_str else datetime.now(timezone.utc))
 
             # 3. Validate and Create Schema
-            reading = SensorReading(**data) 
+            reading = SensorReading(**data)
 
-            await write_accel_point(reading, ts)
-            log.info(f"[Influx] Write Success: {reading.device_id} at {ts}")
-            
+            # Offload InfluxDB write to a thread to avoid blocking the asyncio loop
+            try:
+                # Use the synchronous helper in a thread to avoid event-loop blocking
+                from app.services.influx import write_accel_point_sync
+                await asyncio.to_thread(write_accel_point_sync, reading, ts)
+                log.info(f"[Influx] Write Success: {reading.device_id} at {ts}")
+            except Exception as e:
+                log.error(f"[Influx] Write failed for {reading.device_id}: {e}")
+
         except Exception as e:
             log.error(f"[Drain Error] Failed to process {topic}: {e}")
             continue
