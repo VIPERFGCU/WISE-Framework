@@ -5,6 +5,8 @@ services:
       context: .
       dockerfile: ./Dockerfile
     container_name: fastapi-api
+    networks:
+      - wisenet-network
     env_file:
       - .env
     ports:
@@ -27,6 +29,9 @@ services:
     build:
       context: ./app/frontend
       dockerfile: Dockerfile
+    container_name: wisenet-frontend
+    networks:
+      - wisenet-network
     ports:
       - "8080:80"
     depends_on:
@@ -36,6 +41,8 @@ services:
   influxdb:
     image: influxdb:2.7
     container_name: influxdb
+    networks:
+      - wisenet-network
     ports:
       - "8086:8086"
     volumes:
@@ -78,6 +85,10 @@ services:
     depends_on:
       - influxdb
     restart: unless-stopped
+
+networks:
+  wisenet-network:
+    driver: bridge 
 
 volumes:
   influxdb-data:
