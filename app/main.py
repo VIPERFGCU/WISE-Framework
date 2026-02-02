@@ -161,55 +161,29 @@ async def _drain_mqtt_queue():
             await asyncio.sleep(0.05)
             continue
 
-        # ---- parse & normalize ----
         try:
             data = json.loads(payload_raw)
-        except Exception as e:
-            log.warning(f"[MQTT] bad JSON: {type(e).__name__}: {e}; payload={payload_raw!r}")
-            continue
+            
+            # 1. Parse device_id from topic (devices/bridge-esp32-001/data)
+            parts = topic.split("/")
+            device_from_topic = parts[1] if len(parts) >= 2 else "unknown"
+            
+            # 2. Force the device_id into the data dict for Pydantic validation
+            data["device_id"] = data.get("device_id") or device_from_topic
+            
+            ts_str = data.get("ts")
+            ts = (datetime.fromisoformat(ts_str.replace("Z", "+00:00"))
+                  if ts_str else datetime.now(timezone.utc))
 
-        parts = topic.split("/")
-        device_from_topic = parts[1] if len(parts) >= 3 else None
-        device_id = data.get("device_id") or device_from_topic or "unknown"
+            # 3. Validate and Create Schema
+            reading = SensorReading(**data) 
 
-        ts_str = data.get("ts")
-        ts = (datetime.fromisoformat(ts_str.replace("Z", "+00:00"))
-              if ts_str else datetime.now(timezone.utc))
-
-        # ---- try Influx, but never block WS on failure ----
-        try:
-            # 1 . Creating the schema object required by write_accel_point
-            reading = SensorReading(
-                device_id=device_id,
-                x=float(data.get("x", 0)),
-                y=float(data.get("y", 0)),
-                z=float(data.get("z", 0)),
-            )
-
-            # 2. Calling async service function
             await write_accel_point(reading, ts)
-            log.info(f"[Influx] write succeeded: device_id={device_id} ts={ts.isoformat()}")
+            log.info(f"[Influx] Write Success: {reading.device_id} at {ts}")
+            
         except Exception as e:
-            log.warning(f"[Influx] write failed: {type(e).__name__}: {e}")
-
-        # ---- ALWAYS broadcast to WS ----
-        out = {
-            "device_id": device_id,
-            "x": data.get("x"),
-            "y": data.get("y"),
-            "z": data.get("z"),
-            "ts": ts.isoformat(),
-            "topic": topic,
-        }
-        msg = json.dumps(out)
-        sent = 0
-        for ws in list(active_clients):
-            try:
-                await ws.send_text(msg)
-                sent += 1
-            except Exception:
-                pass
-        log.info(f"[WS] broadcast to {sent} client(s): {out}")
+            log.error(f"[Drain Error] Failed to process {topic}: {e}")
+            continue
 
 @app.on_event("startup")
 async def start_background_tasks():

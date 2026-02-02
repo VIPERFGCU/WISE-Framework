@@ -3,7 +3,7 @@ from datetime import datetime
 from typing import List, Optional
 
 from influxdb_client import InfluxDBClient, Point, WritePrecision
-from influxdb_client.client.write_api import WriteApi
+from influxdb_client.client.write_api import SYNCHRONOUS, WriteApi
 from influxdb_client.client.query_api import QueryApi
 
 from app.core.config import settings
@@ -20,43 +20,29 @@ def _mk_client() -> InfluxDBClient:
             timeout=10_000
         )
 
-
+# Persistent Global Write API
+_write_api = _client.write_api(write_options=SYNCHRONOUS)
 # writes
 
-async def write_accel_point(
-        reading: SensorReading, 
-        ts: datetime,
-        write_api: Optional[WriteAPI] = None,        
-) -> datetime:
+async def write_accel_point(reading: SensorReading, ts: datetime) -> datetime:
     """
-    Write a single accelerometer point. If write_api is not provided, create a short-lived client.
-    Returns the timestamp stored.
+    Write a single accelerometer point using the persistent global Write API.
     """
-    close_client = False
-    if write_api is None:
-        client = _mk_client()
-        write_api = client.write_api()
-        close_client = True
     try:
         p = (
-                Point("accel")
-                .tag("device_id", reading.device_id)
-                .field("x", float(reading.x))
-                .field("y", float(reading.y))
-                .field("z", float(reading.z))
-                .time(ts, WritePrecision.NS) # high precision; Influx stores in ns
+            Point("accel")
+            .tag("device_id", reading.device_id)
+            .field("x", float(reading.x))
+            .field("y", float(reading.y))
+            .field("z", float(reading.z))
+            .time(ts, WritePrecision.NS)
         )
-        write_api.write(bucket=settings.influx_bucket, record=p)
+        # Use the global persistent API
+        _write_api.write(bucket=settings.influx_bucket, record=p)
         return ts
-    finally:
-        if close_client:
-            # Make sure to close only if we created it here
-            write_api.close() # closes underlying client worker
-            try:
-                client.close() # type: ignore[name-defined]
-            except Exception:
-                pass
-
+    except Exception as e:
+        # If the persistent write fails, it is usually a network/auth issue
+        raise e
 # queries
 
 async def read_accel_series(
