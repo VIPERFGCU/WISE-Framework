@@ -11,13 +11,15 @@ from app.core import security
 @lru_cache(maxsize=1)
 def get_influx_client() -> Optional[InfluxDBClient]:
     try:
+        # Use a short timeout (2 seconds) to fail fast if InfluxDB is unavailable
         return InfluxDBClient(
                 url=settings.influx_url,
                 token=settings.influx_token,
                 org=settings.influx_org,
-                timeout=10_000,
+                timeout=2_000,  # 2 second timeout instead of 10
                 )
-    except Exception:
+    except Exception as e:
+        # If connection fails, return None (InfluxDB unavailable)
         return None
 
 def get_influx_write_api(client: Optional[InfluxDBClient] = Depends(get_influx_client)):
