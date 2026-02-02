@@ -38,6 +38,8 @@ services:
     depends_on:
       - api
     restart: unless-stopped
+    environment:
+      - VITE_API_BASE_URL=http://localhost:8000/api/v1
 
   influxdb:
     image: influxdb:2.7
