@@ -91,17 +91,34 @@ async def read_accel_series(
     Read a time series of accelerometer data over a Flux-style range string (e.g., "15m", "1hr").
     """
     if query_api is None:
-        # Create a query API with short timeout
+        # Create a query API with timeout via thread to avoid blocking
         try:
-            client = InfluxDBClient(
-                url=settings.influx_url,
-                token=settings.influx_token,
-                org=settings.influx_org,
-                timeout=2_000
+            import asyncio
+            import threading
+            
+            def create_client():
+                try:
+                    c = InfluxDBClient(
+                        url=settings.influx_url,
+                        token=settings.influx_token,
+                        org=settings.influx_org,
+                        timeout=2_000
+                    )
+                    return c.query_api()
+                except Exception as e:
+                    log.warning(f"Failed to create InfluxDB client: {e}")
+                    return None
+            
+            query_api = await asyncio.wait_for(
+                asyncio.get_running_loop().run_in_executor(None, create_client),
+                timeout=3.0
             )
-            query_api = client.query_api()
+            if query_api is None:
+                raise Exception("Failed to create query API")
+        except asyncio.TimeoutError:
+            raise Exception("InfluxDB client creation timeout")
         except Exception as e:
-            log.warning(f"Failed to create InfluxDB client: {e}")
+            log.warning(f"Failed to initialize InfluxDB for accel: {e}")
             raise
 
     flux = f"""
@@ -146,17 +163,34 @@ async def read_heartbeat_series(
     from app.schemas.sensor import HeartbeatPoint, HeartbeatSeries
     
     if query_api is None:
-        # Create a query API with short timeout
+        # Create a query API with timeout via thread to avoid blocking
         try:
-            client = InfluxDBClient(
-                url=settings.influx_url,
-                token=settings.influx_token,
-                org=settings.influx_org,
-                timeout=2_000
+            import asyncio
+            import threading
+            
+            def create_client():
+                try:
+                    c = InfluxDBClient(
+                        url=settings.influx_url,
+                        token=settings.influx_token,
+                        org=settings.influx_org,
+                        timeout=2_000
+                    )
+                    return c.query_api()
+                except Exception as e:
+                    log.warning(f"Failed to create InfluxDB client: {e}")
+                    return None
+            
+            query_api = await asyncio.wait_for(
+                asyncio.get_running_loop().run_in_executor(None, create_client),
+                timeout=3.0
             )
-            query_api = client.query_api()
+            if query_api is None:
+                raise Exception("Failed to create query API")
+        except asyncio.TimeoutError:
+            raise Exception("InfluxDB client creation timeout")
         except Exception as e:
-            log.warning(f"Failed to create InfluxDB client: {e}")
+            log.warning(f"Failed to initialize InfluxDB for heartbeat: {e}")
             raise
 
     flux = f"""
