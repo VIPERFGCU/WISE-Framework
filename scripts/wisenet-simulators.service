@@ -1,0 +1,15 @@
+[Unit]
+Description=WISENET fake device simulators
+After=network.target
+
+[Service]
+Type=simple
+WorkingDirectory=/home/jcabreu/code/WISENET
+ExecStart=/usr/bin/python3 /home/jcabreu/code/WISENET/scripts/run_simulators.py --broker localhost --port 1883 --devices sim-device-001,esp32-test-01
+Restart=always
+RestartSec=2
+StandardOutput=append:/tmp/wisenet-simulators.log
+StandardError=append:/tmp/wisenet-simulators.log
+
+[Install]
+WantedBy=default.target
