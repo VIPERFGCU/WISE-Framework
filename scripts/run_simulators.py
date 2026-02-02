@@ -5,6 +5,7 @@ import subprocess
 import sys
 import time
 from pathlib import Path
+import paho.mqtt.client as mqtt
 
 def parse_args():
     ap = argparse.ArgumentParser(description="Run WISENET fake device simulators")
@@ -24,6 +25,18 @@ def main():
 
     procs: dict[str, subprocess.Popen] = {}
     stopping = False
+
+    def publish_stop_all():
+        try:
+            client = mqtt.Client(client_id="simulator-controller", clean_session=True)
+            client.connect(args.broker, args.port, keepalive=10)
+            for device_id in devices:
+                topic = f"devices/{device_id}/control"
+                client.publish(topic, '{"cmd":"STOP"}', qos=1)
+                print(f"Sent STOP to {device_id}")
+            client.disconnect()
+        except Exception as e:
+            print(f"Failed to publish STOP: {e}", file=sys.stderr)
 
     def start_device(device_id: str):
         cmd = [
@@ -59,12 +72,16 @@ def main():
     for d in devices:
         start_device(d)
 
+    # Ensure devices are not streaming until explicitly started
+    publish_stop_all()
+
     try:
         while not stopping:
             for device_id, p in list(procs.items()):
                 if p.poll() is not None:
                     print(f"Simulator for {device_id} exited; restarting")
                     start_device(device_id)
+                    publish_stop_all()
             time.sleep(2)
     finally:
         shutdown()
