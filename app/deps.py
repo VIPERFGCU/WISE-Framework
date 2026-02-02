@@ -28,8 +28,7 @@ def get_influx_write_api(client: Optional[InfluxDBClient] = Depends(get_influx_c
 
 def get_influx_query_api(client: Optional[InfluxDBClient] = Depends(get_influx_client)):
     if client is None:
-        raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-                            detail="InfluxDB client not available")
+        return None
     return client.query_api()
 
 # Security dependencies (wrap security.py helpers)

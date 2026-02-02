@@ -87,11 +87,8 @@ async def read_accel_series(
     """
     Read a time series of accelerometer data over a Flux-style range string (e.g., "15m", "1hr").
     """
-    close_client = False
     if query_api is None:
-        client = _mk_client()
-        query_api = client.query_api()
-        close_client = True
+        query_api = _client.query_api()
 
     flux = f"""
 from(bucket: "{settings.influx_bucket}")
@@ -119,12 +116,8 @@ from(bucket: "{settings.influx_bucket}")
                  # Only append rows that have all three componenets
                  if t is not None and x is not None and y is not None and z is not None:
                     points.append(AccelPoint(t=t, x=float(x), y=float(y), z=float(z)))
-    finally:
-        if close_client and client is not None:
-            try:
-                 client.close() # type: ignore[name-defined]
-            except Exception:
-                 pass
+    except Exception as e:
+        raise e
 
     return AccelSeries(device_id=device_id, series=points)
 
@@ -138,11 +131,8 @@ async def read_heartbeat_series(
     """
     from app.schemas.sensor import HeartbeatPoint, HeartbeatSeries
     
-    close_client = False
     if query_api is None:
-        client = _mk_client()
-        query_api = client.query_api()
-        close_client = True
+        query_api = _client.query_api()
 
     flux = f"""
 from(bucket: "{settings.influx_bucket}")
@@ -164,11 +154,7 @@ from(bucket: "{settings.influx_bucket}")
                  rssi = v.get("_value")
                  if t is not None and rssi is not None:
                     points.append(HeartbeatPoint(t=t, rssi=int(rssi)))
-    finally:
-        if close_client and client is not None:
-            try:
-                 client.close()
-            except Exception:
-                 pass
+    except Exception as e:
+        raise e
 
     return HeartbeatSeries(device_id=device_id, series=points)
