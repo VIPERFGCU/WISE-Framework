@@ -4,5 +4,11 @@
     "label": "Test",
     "notes": "Test",
     "last_seen": null
+  },
+  "bridge-esp32-001": {
+    "device_id": "bridge-esp32-001",
+    "label": "bridge-esp32-001",
+    "notes": "registered-by-agent",
+    "last_seen": null
   }
 }
