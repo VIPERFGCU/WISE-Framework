@@ -65,6 +65,7 @@ export default function Streams() {
   const [points, setPoints] = useState<Point[]>([]);
   const [heartbeatPoints, setHeartbeatPoints] = useState<HeartbeatPoint[]>([]);
   const [loading, setLoading] = useState(false);
+  const [devices, setDevices] = useState<{ device_id: string; label?: string }[]>([]);
   // Live MQTT stream via backend WebSocket
   const [livePoints, setLivePoints] = useState<Point[]>([]);
   const [liveHeartbeat, setLiveHeartbeat] = useState<HeartbeatPoint | null>(null);
@@ -131,6 +132,21 @@ export default function Streams() {
     }
   };
 
+  const loadDevices = async () => {
+    try {
+      const res = await api.get("/api/v1/devices");
+      if (Array.isArray(res.data)) {
+        setDevices(res.data.map((d: any) => ({ device_id: d.device_id, label: d.label })));
+      }
+    } catch (e) {
+      setDevices([]);
+    }
+  };
+
+  useEffect(() => {
+    loadDevices();
+  }, []);
+
   useEffect(() => { load(); const id = setInterval(load, 5000); return () => clearInterval(id); }, [device, windowS]);
 
   return (
@@ -139,7 +155,16 @@ export default function Streams() {
 
       <div className="flex items-center gap-3">
         <label className="text-sm">Device ID</label>
-        <input value={device} onChange={(e) => setDevice(e.target.value)} className="border rounded px-2 py-1" />
+        <select value={device} onChange={(e) => setDevice(e.target.value)} className="border rounded px-2 py-1">
+          {devices.length === 0 && (
+            <option value={device}>{device}</option>
+          )}
+          {devices.map((d) => (
+            <option key={d.device_id} value={d.device_id}>
+              {d.label ? `${d.label} (${d.device_id})` : d.device_id}
+            </option>
+          ))}
+        </select>
         <label className="text-sm">Window (s)</label>
         <input type="number" value={windowS} onChange={(e) => setWindowS(Number(e.target.value))} className="border rounded px-2 py-1 w-24" />
         <button onClick={load} className="px-3 py-1 rounded bg-blue-600 text-white">Refresh</button>
