@@ -6,7 +6,7 @@ from app.mqtt import publish_control
 import os, json, paho.mqtt.client as mqtt
 
 
-router = APIRouter(prefix="/api/devices", tags=["control"])
+router = APIRouter(prefix="/api/v1/devices", tags=["control"])
 
 
 class RateUpdate(BaseModel):
