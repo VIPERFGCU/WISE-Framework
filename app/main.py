@@ -121,8 +121,8 @@ _mqtt_queue: Queue[str] = Queue()
 ENABLE_MQTT = os.getenv("ENABLE_MQTT", "true").lower() == "true"
 
 def _paho_on_connect(client, userdata, flags, reason_code, properties=None):
-    log.info(f"[MQTT] Connected (rc={reason_code}), subscribing to {MQTT_TOPIC}")
-    client.subscribe(MQTT_TOPIC)
+    log.info(f"[MQTT] Connected (rc={reason_code}), subscribing to devices/#")
+    client.subscribe("devices/#")
 
 def _paho_on_message(client, userdata, msg):
     try:
