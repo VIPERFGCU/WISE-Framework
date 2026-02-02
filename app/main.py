@@ -117,7 +117,7 @@ async def stream(ws: WebSocket):
 # -------------------------------------------------------------------
 # MQTT Consumer -> InfluxDB + WebSocket fan-out
 # -------------------------------------------------------------------
-MQTT_HOST = os.getenv("MQTT_HOST", "10.0.0.155")
+MQTT_HOST = os.getenv("MQTT_HOST", "mosquitto")
 MQTT_PORT = int(os.getenv("MQTT_PORT", "1883"))
 MQTT_TOPIC = os.getenv("MQTT_TOPIC", "devices/+/data")
 INFLUX_BUCKET = settings.influx_bucket
@@ -127,21 +127,26 @@ _mqtt_queue: Queue[str] = Queue()
 ENABLE_MQTT = os.getenv("ENABLE_MQTT", "true").lower() == "true"
 
 def _paho_on_connect(client, userdata, flags, reason_code, properties=None):
-    log.info(f"[MQTT] Connected (rc={reason_code}), subscribing to devices/#")
-    client.subscribe("devices/#")
+    if reason_code == 0:
+        log.info(f"[MQTT] Connected successfully, subscribing to devices/#")
+        client.subscribe("devices/#")
+    else:
+        log.error(f"[MQTT] Connection failed with code {reason_code}")
 
 def _paho_on_message(client, userdata, msg):
     try:
-        log.info(f"[MQTT TRACE] Received topic: {msg.topic} payload: {msg.payload.decode()}")
-        _mqtt_queue.put_nowait((msg.topic, msg.payload.decode()))
+        # Standard Paho msg objects work similarly, but wrap in try/except for safety
+        payload = msg.payload.decode()
+        log.info(f"[MQTT TRACE] Topic: {msg.topic} | Payload: {payload}")
+        _mqtt_queue.put_nowait((msg.topic, payload))
     except Exception as e:
-        log.warning(f"[MQTT] Queue put failed: {type(e).__name__}: {e}")
+        log.warning(f"[MQTT] Processing failed: {e}")
 
 def _mqtt_thread():
     mqtt_client.on_connect = _paho_on_connect
     mqtt_client.on_message = _paho_on_message
-    while True:
         try:
+            log.info(f"[MQTT] Attempting connection to {MQTT_HOST}:{MQTT_PORT}")
             # Connect using the internal Docker name
             mqtt_client.connect_async(MQTT_HOST, MQTT_PORT, keepalive=60)
             # loop_forever handles reconnections automatically
