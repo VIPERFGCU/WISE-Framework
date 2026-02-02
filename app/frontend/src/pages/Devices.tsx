@@ -28,11 +28,10 @@ export default function Devices() {
 	// per-row action loading states
 	const [senseBusy, setSenseBusy] = useState<Record<string, boolean>>({});
 
-  // controls
-  const [q, setQ] = useState("");
-  const [status, setStatus] = useState<DeviceStatus | "all">("all");
-  const [rec, setRec] = useState<Tri>("all");
-  const [sense, setSense] = useState<Tri>("all");
+	// controls
+	const [q, setQ] = useState("");
+	const [status, setStatus] = useState<DeviceStatus | "all">("all");
+	const [sense, setSense] = useState<Tri>("all");
   const [sortKey, setSortKey] = useState<SortKey>("uptime_desc");
   const [globalHz, setGlobalHz] = useState<string>("");
   const [globalBatch, setGlobalBatch] = useState<string>("");
@@ -64,13 +63,12 @@ export default function Devices() {
   // Compute filtered + sorted rows
   //filter
   const rows = useMemo(() => {
-    let out = devices.filter((d) => {
-      if (status !== "all" && d.status !== status) return false;
-      if (rec !== "all" && d.recording !== (rec === "yes")) return false;
-      if (sense !== "all" && d.sensing !== (sense === "yes")) return false;
-      if (q && !d.sensor_id.toLowerCase().includes(q.toLowerCase())) return false;
-      return true;
-    });
+		let out = devices.filter((d) => {
+			if (status !== "all" && d.status !== status) return false;
+			if (sense !== "all" && d.sensing !== (sense === "yes")) return false;
+			if (q && !d.sensor_id.toLowerCase().includes(q.toLowerCase())) return false;
+			return true;
+		});
 
     // sort
     if (sortKey === "uptime_asc") {
@@ -83,7 +81,7 @@ export default function Devices() {
     }
 
     return out;
-  }, [devices, q, status, rec, sense, sortKey]);
+	}, [devices, q, status, sense, sortKey]);
 
   // helpers
   function isStale(d: Device): boolean {
@@ -206,16 +204,7 @@ export default function Devices() {
           <option value="updating">Status: Updating</option>
           <option value="off">Status: Off</option>
         </select>
-        <select
-          value={rec}
-          onChange={(e) => setRec(e.target.value as Tri)}
-          className="border rounded px-3 py-2 text-sm"
-          title="Recording"
-        >
-          <option value="all">Recording: All</option>
-          <option value="yes">Recording: Y</option>
-          <option value="no">Recording: N</option>
-        </select>
+				{/* Recording filter removed (redundant with Sensing) */}
         <select
           value={sense}
           onChange={(e) => setSense(e.target.value as Tri)}
@@ -252,7 +241,6 @@ export default function Devices() {
               <tr>
                 <th className="px-3 py-2">Sensor ID</th>
                 <th className="px-3 py-2">Status</th>
-                <th className="px-3 py-2">Recording</th>
                 <th className="px-3 py-2">Sensing</th>
 		<th className="px-3 py-2">Freq (Hz)</th>
 		<th className="px-3 py-2">Batch</th>
@@ -273,8 +261,7 @@ export default function Devices() {
 		 >
                   <td className="px-3 py-2 font-mono">{d.sensor_id}</td>
                   <td className="px-3 py-2"><StatusBadge status={d.status} /></td>
-                  <td className="px-3 py-2"><BoolPill value={d.recording} /></td>
-                  <td className="px-3 py-2"><BoolPill value={d.sensing} /></td>
+				  <td className="px-3 py-2"><BoolPill value={d.sensing} /></td>
 		  <td className="px-3 py-2">
 		  	{Number.isFinite(d.sample_hz as any) ? d.sample_hz: "-"}
 		  </td>

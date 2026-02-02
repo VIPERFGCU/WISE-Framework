@@ -89,6 +89,7 @@ services:
       - GF_AUTH_ANONYMOUS_ORG_NAME=Main Org.
     volumes:
       - grafana-storage:/var/lib/grafana
+      - ./grafana/provisioning:/etc/grafana/provisioning:ro
     depends_on:
       - influxdb
     restart: unless-stopped
