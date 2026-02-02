@@ -258,6 +258,7 @@ export default function Devices() {
             <thead className="text-left text-sm text-gray-600 border-b">
               <tr>
                 <th className="px-3 py-2">Sensor ID</th>
+								<th className="px-3 py-2">Label</th>
                 <th className="px-3 py-2">Status</th>
                 <th className="px-3 py-2">Sensing</th>
 		<th className="px-3 py-2">Freq (Hz)</th>
@@ -278,6 +279,7 @@ export default function Devices() {
 			title={Number.isFinite(t) ? new Date(t).toLocaleString() : "unknown"}
 		 >
                   <td className="px-3 py-2 font-mono">{d.sensor_id}</td>
+				  <td className="px-3 py-2">{d.label ?? "-"}</td>
                   <td className="px-3 py-2"><StatusBadge status={d.status} /></td>
 				  <td className="px-3 py-2"><BoolPill value={d.sensing} /></td>
 		  <td className="px-3 py-2">

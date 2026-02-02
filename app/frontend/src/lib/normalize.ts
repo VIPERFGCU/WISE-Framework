@@ -17,9 +17,11 @@ export function normalizeDevice(raw: any): Device {
     raw?.name ??
     raw?.uid ??
     "unknown";
+  const label = raw?.label ?? raw?.name ?? raw?.label_text ?? undefined;
 
   return {
     sensor_id: String(sensor_id),
+    label: label ? String(label) : undefined,
     status: normalizeStatus(raw?.status ?? raw?.online ?? raw?.state),
     recording: Boolean(raw?.recording ?? raw?.is_recording ?? raw?.rec),
     sensing: Boolean(raw?.sensing ?? raw?.is_sensing ?? raw?.sense),
