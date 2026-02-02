@@ -48,3 +48,45 @@ class AccelSeries(BaseModel):
                     ]
                 }
             }
+
+class DeviceHeartbeat(BaseModel):
+    device_id: Optional[str] = None
+    rssi: int = Field(..., description="Signal strength in dBm")
+    uptime_s: int = Field(..., description="Uptime in seconds")
+    fw: Optional[str] = None
+    ts: Optional[str] = None
+
+    class Config:
+        json_schema_extra = {
+            "example": {
+                "device_id": "esp32-bridge-01",
+                "rssi": -45,
+                "uptime_s": 3600,
+                "fw": "esp32-demo-1.0",
+                "ts": "2025-09-25T13:22:11.702Z"
+            }
+        }
+
+class HeartbeatPoint(BaseModel):
+    t: datetime
+    rssi: int
+
+    class Config:
+        json_schema_extra = {
+            "example": {"t": "2025-09-25T13:22:11.702Z", "rssi": -45}
+        }
+
+class HeartbeatSeries(BaseModel):
+    device_id: str
+    series: List[HeartbeatPoint]
+
+    class Config:
+        json_schema_extra = {
+            "example": {
+                "device_id": "esp32-bridge-01",
+                "series": [
+                    {"t": "2025-09-25T13:22:11.702Z", "rssi": -45},
+                    {"t": "2025-09-25T13:22:12.702Z", "rssi": -44}
+                ]
+            }
+        }

@@ -60,6 +60,23 @@ def write_accel_point_sync(reading: SensorReading, ts: datetime) -> datetime:
         return ts
     except Exception as e:
         raise e
+
+def write_heartbeat_sync(device_id: str, rssi: int, uptime_s: int, fw: Optional[str], ts: datetime) -> datetime:
+    """Synchronous write for device heartbeat metrics (RSSI, uptime)."""
+    try:
+        p = (
+            Point("heartbeat")
+            .tag("device_id", device_id)
+            .field("rssi", int(rssi))
+            .field("uptime_s", int(uptime_s))
+        )
+        if fw:
+            p.tag("fw", fw)
+        p.time(ts, WritePrecision.NS)
+        _write_api.write(bucket=settings.influx_bucket, record=p)
+        return ts
+    except Exception as e:
+        raise e
 # queries
 
 async def read_accel_series(
@@ -110,3 +127,48 @@ from(bucket: "{settings.influx_bucket}")
                  pass
 
     return AccelSeries(device_id=device_id, series=points)
+
+async def read_heartbeat_series(
+        device_id: str, 
+        range: str,
+        query_api: Optional[QueryApi] = None,
+) -> "HeartbeatSeries":
+    """
+    Read a time series of heartbeat (RSSI) data over a Flux-style range string.
+    """
+    from app.schemas.sensor import HeartbeatPoint, HeartbeatSeries
+    
+    close_client = False
+    if query_api is None:
+        client = _mk_client()
+        query_api = client.query_api()
+        close_client = True
+
+    flux = f"""
+from(bucket: "{settings.influx_bucket}")
+  |> range(start: -{range})
+  |> filter(fn: (r) => r._measurement == "heartbeat")
+  |> filter(fn: (r) => r.device_id == "{device_id}")
+  |> filter(fn: (r) => r._field == "rssi")
+  |> sort(columns: ["_time"])
+"""
+
+    points: List[HeartbeatPoint] = []
+
+    try:
+        tables = query_api.query(org=settings.influx_org, query=flux)
+        for table in tables:
+            for record in table.records:
+                 v = record.values
+                 t = v.get("_time")
+                 rssi = v.get("_value")
+                 if t is not None and rssi is not None:
+                    points.append(HeartbeatPoint(t=t, rssi=int(rssi)))
+    finally:
+        if close_client and client is not None:
+            try:
+                 client.close()
+            except Exception:
+                 pass
+
+    return HeartbeatSeries(device_id=device_id, series=points)

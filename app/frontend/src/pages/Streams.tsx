@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { api } from "../api/client";
 
 type Point = { t: string; x: number; y: number; z: number };
+type HeartbeatPoint = { t: string; rssi: number };
 
 function Sparkline({ data, color }: { data: number[]; color: string }) {
   const w = 600, h = 120, pad = 6;
@@ -61,18 +62,32 @@ export default function Streams() {
   const [device, setDevice] = useState<string>("bridge-esp32-001");
   const [windowS, setWindowS] = useState<number>(60);
   const [points, setPoints] = useState<Point[]>([]);
+  const [heartbeatPoints, setHeartbeatPoints] = useState<HeartbeatPoint[]>([]);
   const [loading, setLoading] = useState(false);
 
   const load = async () => {
     try {
       setLoading(true);
       const res = await api.get(`/api/preview/${encodeURIComponent(device)}?window_s=${windowS}`);
-      const data = res.data?.series ?? [];
-      // convert to expected shape
-      const pts = data.map((p: any) => ({ t: p.t, x: p.x, y: p.y, z: p.z }));
-      setPoints(pts);
+      
+      // Parse accelerometer data
+      if (res.data?.accel?.series) {
+        const pts = res.data.accel.series.map((p: any) => ({ t: p.t, x: p.x, y: p.y, z: p.z }));
+        setPoints(pts);
+      } else {
+        setPoints([]);
+      }
+
+      // Parse heartbeat data
+      if (res.data?.heartbeat?.series) {
+        const hbPts = res.data.heartbeat.series.map((p: any) => ({ t: p.t, rssi: p.rssi }));
+        setHeartbeatPoints(hbPts);
+      } else {
+        setHeartbeatPoints([]);
+      }
     } catch (e) {
       setPoints([]);
+      setHeartbeatPoints([]);
     } finally {
       setLoading(false);
     }
@@ -94,21 +109,31 @@ export default function Streams() {
 
       <div className="bg-white border rounded p-3">
         {loading && <div className="text-sm text-gray-500">Loading…</div>}
-        {!loading && points.length === 0 && <div className="text-sm text-gray-500">No data for this device/window.</div>}
+        {!loading && points.length === 0 && heartbeatPoints.length === 0 && <div className="text-sm text-gray-500">No data for this device/window.</div>}
+        
+        {/* Heartbeat Graph */}
+        {!loading && heartbeatPoints.length > 0 && (
+          <div className="mb-6">
+            <div className="text-sm text-gray-600 font-semibold mb-2">Signal Strength (RSSI)</div>
+            <Sparkline data={heartbeatPoints.map(p => p.rssi)} color="#8b5cf6" />
+          </div>
+        )}
+
+        {/* Accelerometer Graphs */}
         {!loading && points.length > 0 && (
           <div>
-            <div className="text-sm text-gray-600">Combined X / Y / Z</div>
+            <div className="text-sm text-gray-600 font-semibold mb-2">Combined X / Y / Z</div>
             <MultiSparkline series={[
               { data: points.map(p => p.x), color: '#ef4444', label: 'X' },
               { data: points.map(p => p.y), color: '#06b6d4', label: 'Y' },
               { data: points.map(p => p.z), color: '#10b981', label: 'Z' }
             ]} />
             <div className="h-4" />
-            <div className="text-sm text-gray-600">X axis</div>
+            <div className="text-sm text-gray-600 font-semibold mb-2">X axis</div>
             <Sparkline data={points.map(p => p.x)} color="#ef4444" />
-            <div className="text-sm text-gray-600 mt-2">Y axis</div>
+            <div className="text-sm text-gray-600 font-semibold mt-4 mb-2">Y axis</div>
             <Sparkline data={points.map(p => p.y)} color="#06b6d4" />
-            <div className="text-sm text-gray-600 mt-2">Z axis</div>
+            <div className="text-sm text-gray-600 font-semibold mt-4 mb-2">Z axis</div>
             <Sparkline data={points.map(p => p.z)} color="#10b981" />
           </div>
         )}

@@ -14,8 +14,8 @@ from paho.mqtt import client as paho
 from app.api.v1 import devices, ingest, query, health, control, preview
 from app.core.config import settings
 from app.deps import get_influx_client
-from app.services.influx import write_accel_point
-from app.schemas.sensor import SensorReading
+from app.services.influx import write_accel_point, write_heartbeat_sync
+from app.schemas.sensor import SensorReading, DeviceHeartbeat
 from app.mqtt import mqtt_client, publish_control, set_connection_event
 
 # -------------------------------------------------------------------
@@ -172,8 +172,7 @@ def _mqtt_thread():
 # -------------------------------------------------------------------
 async def _drain_mqtt_queue():
     """Consume messages placed on the thread-safe queue by the Paho callbacks.
-    Only `/data` topics are parsed as `SensorReading` to avoid validation errors
-    for `status` or `control` messages which have different schemas.
+    Processes both /data (sensor readings) and /heartbeat topics.
     """
     while True:
         try:
@@ -183,35 +182,48 @@ async def _drain_mqtt_queue():
             continue
 
         try:
-            # Only process sensor data messages
-            if not topic.endswith("/data"):
-                log.debug(f"[MQTT] Ignoring non-data message on {topic}")
-                continue
-
             data = json.loads(payload_raw)
-
-            # 1. Parse device_id from topic (devices/bridge-esp32-001/data)
             parts = topic.split("/")
-            device_from_topic = parts[1] if len(parts) >= 2 else "unknown"
+            device_id = parts[1] if len(parts) >= 2 else "unknown"
 
-            # 2. Force the device_id into the data dict for Pydantic validation
-            data["device_id"] = data.get("device_id") or device_from_topic
+            # Handle sensor data messages
+            if topic.endswith("/data"):
+                data["device_id"] = data.get("device_id") or device_id
+                ts_str = data.get("ts")
+                ts = (datetime.fromisoformat(ts_str.replace("Z", "+00:00"))
+                      if ts_str else datetime.now(timezone.utc))
+                reading = SensorReading(**data)
 
-            ts_str = data.get("ts")
-            ts = (datetime.fromisoformat(ts_str.replace("Z", "+00:00"))
-                  if ts_str else datetime.now(timezone.utc))
+                try:
+                    from app.services.influx import write_accel_point_sync
+                    await asyncio.to_thread(write_accel_point_sync, reading, ts)
+                    log.info(f"[Influx] Write Success: {reading.device_id} at {ts}")
+                except Exception as e:
+                    log.error(f"[Influx] Write failed for {reading.device_id}: {e}")
 
-            # 3. Validate and Create Schema
-            reading = SensorReading(**data)
+            # Handle heartbeat messages
+            elif topic.endswith("/heartbeat"):
+                data["device_id"] = data.get("device_id") or device_id
+                ts_str = data.get("ts")
+                ts = (datetime.fromisoformat(ts_str.replace("Z", "+00:00"))
+                      if ts_str else datetime.now(timezone.utc))
+                hb = DeviceHeartbeat(**data)
 
-            # Offload InfluxDB write to a thread to avoid blocking the asyncio loop
-            try:
-                # Use the synchronous helper in a thread to avoid event-loop blocking
-                from app.services.influx import write_accel_point_sync
-                await asyncio.to_thread(write_accel_point_sync, reading, ts)
-                log.info(f"[Influx] Write Success: {reading.device_id} at {ts}")
-            except Exception as e:
-                log.error(f"[Influx] Write failed for {reading.device_id}: {e}")
+                try:
+                    await asyncio.to_thread(
+                        write_heartbeat_sync,
+                        hb.device_id or device_id,
+                        hb.rssi,
+                        hb.uptime_s,
+                        hb.fw,
+                        ts
+                    )
+                    log.info(f"[Influx] Heartbeat Write Success: {device_id} (rssi={hb.rssi})")
+                except Exception as e:
+                    log.error(f"[Influx] Heartbeat Write failed for {device_id}: {e}")
+
+            else:
+                log.debug(f"[MQTT] Ignoring non-data/heartbeat message on {topic}")
 
         except Exception as e:
             log.error(f"[Drain Error] Failed to process {topic}: {e}")
