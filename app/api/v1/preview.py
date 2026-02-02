@@ -19,8 +19,7 @@ class PreviewResponse(BaseModel):
 async def preview(device_id: str, window_s: int = Query(60, ge=1, le=3600)):
     """Return accelerometer and heartbeat series for the given device over the last `window_s` seconds.
     
-    Note: InfluxDB queries are done directly without dependency injection to avoid blocking
-    when InfluxDB is unavailable.
+    Returns empty series if InfluxDB is unavailable to allow frontend to render gracefully.
     """
     
     # Convert seconds to a Flux range shorthand
@@ -34,30 +33,31 @@ async def preview(device_id: str, window_s: int = Query(60, ge=1, le=3600)):
     accel_data = None
     heartbeat_data = None
 
-    # Try accel with timeout (query_api will be created inside read_accel_series)
+    # Try accel with timeout
     try:
         accel_series = await asyncio.wait_for(
             read_accel_series(device_id=device_id, range=rng, query_api=None),
-            timeout=5.0
+            timeout=2.0
         )
         accel_data = accel_series.model_dump()
     except asyncio.TimeoutError:
-        log.warning(f"[Preview] Accel query timeout for {device_id}")
+        log.debug(f"[Preview] Accel query timeout for {device_id}")
     except Exception as e:
-        log.warning(f"[Preview] Accel query failed for {device_id}: {e}")
+        log.debug(f"[Preview] Accel query failed for {device_id}: {e}")
 
-    # Try heartbeat with timeout (query_api will be created inside read_heartbeat_series)
+    # Try heartbeat with timeout
     try:
         heartbeat_series = await asyncio.wait_for(
             read_heartbeat_series(device_id=device_id, range=rng, query_api=None),
-            timeout=5.0
+            timeout=2.0
         )
         heartbeat_data = heartbeat_series.model_dump()
     except asyncio.TimeoutError:
-        log.warning(f"[Preview] Heartbeat query timeout for {device_id}")
+        log.debug(f"[Preview] Heartbeat query timeout for {device_id}")
     except Exception as e:
-        log.warning(f"[Preview] Heartbeat query failed for {device_id}: {e}")
+        log.debug(f"[Preview] Heartbeat query failed for {device_id}: {e}")
 
+    # Return response with whatever data is available (may be None/empty)
     return {
         "device_id": device_id,
         "accel": accel_data,
