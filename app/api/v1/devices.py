@@ -6,7 +6,7 @@ import paho.mqtt.client as mqtt
 from datetime import datetime
 
 from app import deps
-from app.schemas.device import DeviceCreate, DeviceOut
+from app.schemas.device import DeviceCreate, DeviceOut, DeviceOutAdmin
 from app.services import devices as svc
 
 router = APIRouter(prefix="/api/v1/devices", tags=["devices"])
@@ -112,15 +112,21 @@ def _cached_status_detail(device_id: str) -> Dict[str, Any]:
 
 @router.post(
     "/register",
-    response_model=DeviceOut,
+    response_model=DeviceOutAdmin,
     status_code=status.HTTP_201_CREATED,
     summary="Register or update a device",
     dependencies=[Depends(deps.require_api_key_or_role("admin"))],
 )
 async def register_device(payload: DeviceCreate) -> DeviceOut:
     rec = svc.register(device_id=payload.device_id, label=payload.label, notes=payload.notes)
-    # Return a DeviceOut enriched with non-blocking cached telemetry when available
-    return _deviceout_from_cache(rec.device_id, rec)
+    # Build the enriched DeviceOut and attach the mqtt_key for admin consumers
+    out = _deviceout_from_cache(rec.device_id, rec)
+    # attach mqtt key if present
+    try:
+        setattr(out, "mqtt_key", getattr(rec, "mqtt_key", None))
+    except Exception:
+        pass
+    return out
 
 @router.get(
     "",

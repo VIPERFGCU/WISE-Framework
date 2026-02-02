@@ -14,6 +14,7 @@ class DeviceRecord:
     label: Optional[str] = None
     notes: Optional[str] = None
     last_seen: Optional[str] = None  # ISO8601 string
+    mqtt_key: Optional[str] = None
 
 def _load() -> Dict[str, DeviceRecord]:
     if not _REGISTRY_PATH.exists():
@@ -33,6 +34,13 @@ def register(device_id: str, label: Optional[str] = None, notes: Optional[str] =
         rec.label = label
     if notes is not None:
         rec.notes = notes
+    # Ensure a device has an mqtt_key for broker authentication if not present
+    if not getattr(rec, "mqtt_key", None):
+        try:
+            import secrets
+            rec.mqtt_key = secrets.token_urlsafe(16)
+        except Exception:
+            rec.mqtt_key = None
     state[device_id] = rec
     _save(state)
     return rec

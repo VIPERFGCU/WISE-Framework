@@ -16,3 +16,8 @@ class DeviceOut(BaseModel):
     sample_hz: Optional[int] = None
     batch_size: Optional[int] = None
     uptime_seconds: Optional[int] = None
+
+
+class DeviceOutAdmin(DeviceOut):
+    # Secret returned to admins when registering a device so firmware can authenticate
+    mqtt_key: Optional[str] = None
