@@ -145,6 +145,7 @@ def _paho_on_message(client, userdata, msg):
 def _mqtt_thread():
     mqtt_client.on_connect = _paho_on_connect
     mqtt_client.on_message = _paho_on_message
+    while True:
         try:
             log.info(f"[MQTT] Attempting connection to {MQTT_HOST}:{MQTT_PORT}")
             # Connect using the internal Docker name
