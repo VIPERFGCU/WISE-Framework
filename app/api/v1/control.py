@@ -1,5 +1,5 @@
 # app/api/v1/control.py
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, Body
 from pydantic import BaseModel
 from app import deps
 from app.mqtt import publish_control 
@@ -16,7 +16,7 @@ class BatchUpdate(BaseModel):
     batch_size: int
 
 @router.post("/{device_id}/start")
-async def start_device(device_id: str, body: dict = None):
+async def start_device(device_id: str, body: dict = Body(None)):
     rate_hz = (body or {}).get("rate_hz", 10)
     if publish_control(device_id, {"cmd": "START", "rate_hz": int(rate_hz)}):
         return {"ok": True}

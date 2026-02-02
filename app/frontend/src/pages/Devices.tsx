@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { listDevices, setRecording, setSensing, setFrequency, setBatchSize } from "../services/devices";
+import { listDevices, setSensing, setFrequency, setBatchSize } from "../services/devices";
 import type { Device, DeviceStatus } from "../types/device";
 import StatusBadge from "../components/StatusBadge";
 import BoolPill from "../components/BoolPill";
@@ -25,9 +25,8 @@ export default function Devices() {
   	"transition-colors duration-150",
   ].join(" ");
 
-  // per-row action loading states
-  const [recBusy, setRecBusy] = useState<Record<string, boolean>>({});
-  const [senseBusy, setSenseBusy] = useState<Record<string, boolean>>({});
+	// per-row action loading states
+	const [senseBusy, setSenseBusy] = useState<Record<string, boolean>>({});
 
   // controls
   const [q, setQ] = useState("");
@@ -93,21 +92,7 @@ export default function Devices() {
 	  return Date.now() - t > STALE_SEC * 1000;
   }
 
-  const toggleRecording = async (d: Device) => {
-	  const next = !d.recording;
-	  setRecBusy((m) => ({ ...m, [d.sensor_id]: true }));
-	  // optimistic local update
-	  setDevices((list) => list.map((x) => (x.sensor_id === d.sensor_id ? { ...x, recording: next } : x)));
-	  try {
-		  await setRecording(d.sensor_id, next);
-	  } catch (e: any) {
-		  // rollback on error
-		  setDevices((list) => list.map((x) => (x.sensor_id === d.sensor_id ? { ...x, recording: !next } : x)));
-		  emitError(e?.message ?? "Failed to update recording");
-	  } finally {
-		  setRecBusy((m) => ({ ...m, [d.sensor_id]: false }));
-	  }
-  };
+  
 
   const toggleSensing = async (d: Device) => {
 	  const next = !d.sensing;
@@ -355,14 +340,7 @@ export default function Devices() {
 				Set Batch
 			</button>
 
-		     	<button
-			   onClick={() => toggleRecording(d)}
-			   disabled={!!recBusy[d.sensor_id]}
-			   className={btn}
-			   title={d.recording ? "Stop recording" : "Start recording"}
-			>
-			   {recBusy[d.sensor_id] ? "..." : d.recording ? "Stop Rec" : "Start Rec"}
-			</button>
+
 			<button
 			   onClick={() => toggleSensing(d)}
 			   disabled={!!senseBusy[d.sensor_id]}
