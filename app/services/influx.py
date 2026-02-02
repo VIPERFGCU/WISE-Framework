@@ -12,7 +12,7 @@ from app.schemas.sensor import SensorReading, AccelSeries, AccelPoint
 
 # helpers
 
-def _mk_client() -> InfluxDBClient:
+_client() -> InfluxDBClient:
     return InfluxDBClient(
             url=settings.influx_url,
             token=settings.influx_token,
