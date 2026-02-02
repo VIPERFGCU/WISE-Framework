@@ -132,6 +132,7 @@ def _paho_on_connect(client, userdata, flags, reason_code, properties=None):
 
 def _paho_on_message(client, userdata, msg):
     try:
+        log.info(f"[MQTT TRACE] Received topic: {msg.topic} payload: {msg.payload.decode()}")
         _mqtt_queue.put_nowait((msg.topic, msg.payload.decode()))
     except Exception as e:
         log.warning(f"[MQTT] Queue put failed: {type(e).__name__}: {e}")
