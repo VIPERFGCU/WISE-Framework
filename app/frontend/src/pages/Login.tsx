@@ -5,7 +5,7 @@ import { setToken } from "../lib/auth";
 const FAKE = import.meta.env.VITE_DEV_FAKE_AUTH === "true";
 
 export default function Login() {
-  const [email, setEmail] = useState("");
+  const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [err, setErr] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -21,7 +21,7 @@ export default function Login() {
         setToken("dev-fake-token");
       } else {
         // adjust to your FastAPI route/shape
-        const { data } = await api.post("/api/v1/auth/login", { email, password });
+        const { data } = await api.post("/api/v1/auth/login", { username, password });
         const token = data?.access_token ?? data?.token ?? "";
         if (!token) throw new Error("No token in response");
         setToken(token);
@@ -45,13 +45,13 @@ export default function Login() {
         )}
         {err && <div className="mb-3 text-sm text-red-600">{err}</div>}
         <label className="block mb-2 text-sm">
-          Email
+          Username
           <input
-            type="email"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
+            type="text"
+            value={username}
+            onChange={(e) => setUsername(e.target.value)}
             className="mt-1 w-full border rounded px-3 py-2"
-            placeholder="you@example.com"
+            placeholder="admin"
             required={!FAKE}
           />
         </label>

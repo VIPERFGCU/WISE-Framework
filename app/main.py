@@ -12,6 +12,7 @@ from influxdb_client.client.write_api import SYNCHRONOUS
 from paho.mqtt import client as paho
 
 from app.api.v1 import devices, ingest, query, health, control, preview
+from app.api.v1 import auth
 from app.core.config import settings
 from app.deps import get_influx_client
 from app.services.influx import write_accel_point, write_heartbeat_sync
@@ -72,6 +73,7 @@ app.include_router(query.router)
 app.include_router(devices.router)
 app.include_router(control.router)
 app.include_router(preview.router)
+app.include_router(auth.router)
 
 # -------------------------------------------------------------------
 # Debug / Manual Control
