@@ -142,7 +142,7 @@ def _mqtt_thread():
     while True:
         try:
             # Connect using the internal Docker name
-            mqtt_client.connect(MQTT_HOST, MQTT_PORT, keepalive=60)
+            mqtt_client.connect_async(MQTT_HOST, MQTT_PORT, keepalive=60)
             # loop_forever handles reconnections automatically
             mqtt_client.loop_forever()
         except Exception as e:
