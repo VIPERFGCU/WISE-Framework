@@ -65,6 +65,7 @@ export default function Streams() {
   const [points, setPoints] = useState<Point[]>([]);
   const [heartbeatPoints, setHeartbeatPoints] = useState<HeartbeatPoint[]>([]);
   const [loading, setLoading] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
   const [devices, setDevices] = useState<{ device_id: string; label?: string }[]>([]);
   // Live MQTT stream via backend WebSocket
   const [livePoints, setLivePoints] = useState<Point[]>([]);
@@ -104,16 +105,20 @@ export default function Streams() {
     }
   }, []);
 
-  const load = async () => {
+  const load = async (silent: boolean = false) => {
     try {
-      setLoading(true);
+      if (silent) {
+        setRefreshing(true);
+      } else {
+        setLoading(true);
+      }
       const res = await api.get(`/api/preview/${encodeURIComponent(device)}?window_s=${windowS}`);
       
       // Parse accelerometer data
       if (res.data?.accel?.series) {
         const pts = res.data.accel.series.map((p: any) => ({ t: p.t, x: p.x, y: p.y, z: p.z }));
         setPoints(pts);
-      } else {
+      } else if (!silent) {
         setPoints([]);
       }
 
@@ -121,14 +126,17 @@ export default function Streams() {
       if (res.data?.heartbeat?.series) {
         const hbPts = res.data.heartbeat.series.map((p: any) => ({ t: p.t, rssi: p.rssi }));
         setHeartbeatPoints(hbPts);
-      } else {
+      } else if (!silent) {
         setHeartbeatPoints([]);
       }
     } catch (e) {
-      setPoints([]);
-      setHeartbeatPoints([]);
+      if (!silent) {
+        setPoints([]);
+        setHeartbeatPoints([]);
+      }
     } finally {
       setLoading(false);
+      setRefreshing(false);
     }
   };
 
@@ -147,7 +155,13 @@ export default function Streams() {
     loadDevices();
   }, []);
 
-  useEffect(() => { load(); const id = setInterval(load, 5000); return () => clearInterval(id); }, [device, windowS]);
+  useEffect(() => {
+    setPoints([]);
+    setHeartbeatPoints([]);
+    load(false);
+    const id = setInterval(() => load(true), 5000);
+    return () => clearInterval(id);
+  }, [device, windowS]);
 
   return (
     <div className="flex flex-col h-full space-y-4 p-4">
@@ -167,7 +181,7 @@ export default function Streams() {
         </select>
         <label className="text-sm">Window (s)</label>
         <input type="number" value={windowS} onChange={(e) => setWindowS(Number(e.target.value))} className="border rounded px-2 py-1 w-24" />
-        <button onClick={load} className="px-3 py-1 rounded bg-blue-600 text-white">Refresh</button>
+        <button onClick={() => load(false)} className="px-3 py-1 rounded bg-blue-600 text-white">Refresh</button>
       </div>
 
       <div className="bg-white border rounded p-3">
@@ -193,7 +207,11 @@ export default function Streams() {
             )}
           </div>
         </div>
-        {loading && <div className="text-sm text-gray-500">Loading…</div>}
+        {(loading || refreshing) && (
+          <div className="text-xs text-gray-500 mb-2">
+            {loading ? "Loading…" : "Refreshing…"}
+          </div>
+        )}
         {!loading && points.length === 0 && heartbeatPoints.length === 0 && (
           <div className="text-sm text-gray-500">
             No data available. Graphs will appear here when sensor data is available.
@@ -201,7 +219,7 @@ export default function Streams() {
         )}
         
         {/* Heartbeat Graph */}
-        {!loading && heartbeatPoints.length > 0 && (
+        {heartbeatPoints.length > 0 && (
           <div className="mb-6">
             <div className="text-sm text-gray-600 font-semibold mb-2">Signal Strength (RSSI)</div>
             <Sparkline data={heartbeatPoints.map(p => p.rssi)} color="#8b5cf6" />
@@ -209,7 +227,7 @@ export default function Streams() {
         )}
 
         {/* Accelerometer Graphs */}
-        {!loading && points.length > 0 && (
+        {points.length > 0 && (
           <div>
             <div className="text-sm text-gray-600 font-semibold mb-2">Combined X / Y / Z</div>
             <MultiSparkline series={[
