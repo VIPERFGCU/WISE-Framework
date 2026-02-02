@@ -28,6 +28,12 @@ export default function Devices() {
 	// per-row action loading states
 	const [senseBusy, setSenseBusy] = useState<Record<string, boolean>>({});
 
+	// per-row freq/batch input values and busy states
+	const [freqInputs, setFreqInputs] = useState<Record<string, string>>({});
+	const [batchInputs, setBatchInputs] = useState<Record<string, string>>({});
+	const [freqBusy, setFreqBusy] = useState<Record<string, boolean>>({});
+	const [batchBusy, setBatchBusy] = useState<Record<string, boolean>>({});
+
 	// controls
 	const [q, setQ] = useState("");
 	const [status, setStatus] = useState<DeviceStatus | "all">("all");
@@ -59,6 +65,18 @@ export default function Devices() {
     const id = setInterval(load, 10_000);
     return () => clearInterval(id);
   }, []);
+
+  // Initialize per-row input values from device list when devices change
+  useEffect(() => {
+    const f: Record<string, string> = {};
+    const b: Record<string, string> = {};
+    for (const d of devices) {
+      if (d.sample_hz != null) f[d.sensor_id] = String(d.sample_hz);
+      if (d.batch_size != null) b[d.sensor_id] = String(d.batch_size);
+    }
+    setFreqInputs((prev) => ({ ...f, ...prev }));
+    setBatchInputs((prev) => ({ ...b, ...prev }));
+  }, [devices]);
 
   // Compute filtered + sorted rows
   //filter
@@ -263,10 +281,60 @@ export default function Devices() {
                   <td className="px-3 py-2"><StatusBadge status={d.status} /></td>
 				  <td className="px-3 py-2"><BoolPill value={d.sensing} /></td>
 		  <td className="px-3 py-2">
-		  	{Number.isFinite(d.sample_hz as any) ? d.sample_hz: "-"}
+		  	{/* per-row freq input */}
+			<div className="flex items-center gap-2">
+			  <input
+				value={freqInputs[d.sensor_id] ?? (d.sample_hz != null ? String(d.sample_hz) : "")}
+				onChange={(e) => setFreqInputs((m) => ({ ...m, [d.sensor_id]: e.target.value }))}
+				inputMode="numeric"
+				className="border rounded px-2 py-1 text-sm w-24"
+				placeholder="Hz"
+			  />
+			  <button
+				onClick={async () => {
+				const v = freqInputs[d.sensor_id];
+				const hz = Number(v);
+				if (!Number.isFinite(hz) || hz <= 0) { emitError("Enter a positive number for frequency."); return; }
+				setFreqBusy((m) => ({ ...m, [d.sensor_id]: true }));
+				try {
+					await setFrequency(d.sensor_id, hz);
+					await load();
+				} catch (e: any) { emitError(e?.message ?? "Failed to set frequency"); }
+				finally { setFreqBusy((m) => ({ ...m, [d.sensor_id]: false })); }
+				}}
+				className={btn}
+			  >
+				{freqBusy[d.sensor_id] ? "..." : "Apply"}
+			  </button>
+			</div>
 		  </td>
 		  <td className="px-3 py-2">
-		     {Number.isFinite(d.batch_size as any) ? d.batch_size: "-"}
+		     {/* per-row batch input */}
+			<div className="flex items-center gap-2">
+			  <input
+				value={batchInputs[d.sensor_id] ?? (d.batch_size != null ? String(d.batch_size) : "")}
+				onChange={(e) => setBatchInputs((m) => ({ ...m, [d.sensor_id]: e.target.value }))}
+				inputMode="numeric"
+				className="border rounded px-2 py-1 text-sm w-24"
+				placeholder="batch"
+			  />
+			  <button
+				onClick={async () => {
+				const v = batchInputs[d.sensor_id];
+				const bs = Number(v);
+				if (!Number.isFinite(bs) || bs <= 0) { emitError("Enter a positive integer for batch size."); return; }
+				setBatchBusy((m) => ({ ...m, [d.sensor_id]: true }));
+				try {
+					await setBatchSize(d.sensor_id, bs);
+					await load();
+				} catch (e: any) { emitError(e?.message ?? "Failed to set batch size"); }
+				finally { setBatchBusy((m) => ({ ...m, [d.sensor_id]: false })); }
+				}}
+				className={btn}
+			  >
+				{batchBusy[d.sensor_id] ? "..." : "Apply"}
+			  </button>
+			</div>
 		  </td>
 		  <td className="px-3 py-2">{formatUptime(d.uptime_seconds)}</td>
 		  <td className="px-3 py-2">
@@ -277,57 +345,6 @@ export default function Devices() {
 		  </td>
 		  <td className="px-3 py-2">
 		     <div className="flex items-center gap-2">
-		        <button
-			   onClick={async () => {
-				   const v = window.prompt(
-					   "Set frequency (Hz)",
-					   d.sample_hz != null ? String(d.sample_hz) : ""
-				   );
-				   if (v == null) return;
-				   const hz = Number(v);
-				   if (!Number.isFinite(hz) || hz <= 0) {
-					   emitError("Enter a positive number for frequency.");
-					   return;
-				   }
-				   try {
-					   await setFrequency(d.sensor_id, hz);
-					   await load();
-				   } catch (e: any) {
-					   emitError(e?.message ?? "Failed to set frequency");
-				   }
-			   }}
-			   className={btn}
-			   title="Set sampling frequency"
-			>
-				Set Freq
-			</button>
-
-			<button 
-			   onClick={async () => {
-				   const v = window.prompt(
-					   "Set batch size",
-					   d.batch_size != null ? String(d.batch_size) : ""
-				   );
-				   if (v == null) return;
-				   const bs = Number(v);
-				   if (!Number.isFinite(bs) || bs <= 0) {
-					   emitError("Enter a positive integer for batch size.");
-					   return;
-				   }
-				   try {
-					   await setBatchSize(d.sensor_id, bs);
-					   await load();
-				   } catch (e: any) {
-					   emitError(e?.message ?? "Failed to set batch size");
-				   }
-			   }}
-			   className={btn}
-			   title="Set batch size"
-			>
-				Set Batch
-			</button>
-
-
 			<button
 			   onClick={() => toggleSensing(d)}
 			   disabled={!!senseBusy[d.sensor_id]}
