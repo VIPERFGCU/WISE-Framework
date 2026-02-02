@@ -109,7 +109,11 @@ export default function Streams() {
 
       <div className="bg-white border rounded p-3">
         {loading && <div className="text-sm text-gray-500">Loading…</div>}
-        {!loading && points.length === 0 && heartbeatPoints.length === 0 && <div className="text-sm text-gray-500">No data for this device/window.</div>}
+        {!loading && points.length === 0 && heartbeatPoints.length === 0 && (
+          <div className="text-sm text-gray-500">
+            No data available. Graphs will appear here when sensor data is available.
+          </div>
+        )}
         
         {/* Heartbeat Graph */}
         {!loading && heartbeatPoints.length > 0 && (
