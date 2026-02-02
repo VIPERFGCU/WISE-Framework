@@ -5,7 +5,6 @@ services:
       context: .
       dockerfile: ./Dockerfile
     container_name: fastapi-api
-    network_mode: "host"
     env_file:
       - .env
     ports:
