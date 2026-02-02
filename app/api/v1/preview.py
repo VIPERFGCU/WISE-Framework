@@ -21,13 +21,25 @@ async def preview(device_id: str, window_s: int = Query(60, ge=1, le=3600)):
     
     Returns immediately with empty/None data if InfluxDB is not accessible.
     """
-    # For now, always return empty data since InfluxDB is not available in dev environment
-    # When InfluxDB is properly set up, the read_* functions will query real data
     log.debug(f"[Preview] Request for device={device_id}, window={window_s}s")
+    
+    # Convert window_s to Flux range string (e.g., 60s -> "1m")
+    if window_s < 60:
+        range_str = f"{window_s}s"
+    elif window_s < 3600:
+        range_str = f"{window_s // 60}m"
+    else:
+        range_str = f"{window_s // 3600}h"
+    
+    # Query both accel and heartbeat series in parallel
+    accel_task = read_accel_series(device_id, range_str)
+    heartbeat_task = read_heartbeat_series(device_id, range_str)
+    
+    accel_series, heartbeat_series = await asyncio.gather(accel_task, heartbeat_task)
     
     return {
         "device_id": device_id,
-        "accel": None,
-        "heartbeat": None,
+        "accel": {"series": accel_series.series} if accel_series.series else None,
+        "heartbeat": {"series": heartbeat_series.series} if heartbeat_series.series else None,
     }
 

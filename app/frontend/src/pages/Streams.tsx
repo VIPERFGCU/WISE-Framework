@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { api } from "../api/client";
+import { useRef } from "react";
 
 type Point = { t: string; x: number; y: number; z: number };
 type HeartbeatPoint = { t: string; rssi: number };
@@ -64,6 +65,43 @@ export default function Streams() {
   const [points, setPoints] = useState<Point[]>([]);
   const [heartbeatPoints, setHeartbeatPoints] = useState<HeartbeatPoint[]>([]);
   const [loading, setLoading] = useState(false);
+  // Live MQTT stream via backend WebSocket
+  const [livePoints, setLivePoints] = useState<Point[]>([]);
+  const [liveHeartbeat, setLiveHeartbeat] = useState<HeartbeatPoint | null>(null);
+  const wsRef = useRef<WebSocket | null>(null);
+
+  useEffect(() => {
+    try {
+      const scheme = window.location.protocol === "https:" ? "wss" : "ws";
+      const ws = new WebSocket(`${scheme}://${window.location.host}/api/v1/stream`);
+      wsRef.current = ws;
+      ws.onopen = () => console.info("WS open");
+      ws.onclose = () => console.info("WS closed");
+      ws.onerror = (e) => console.warn("WS error", e);
+      ws.onmessage = (ev) => {
+        try {
+          const msg = JSON.parse(ev.data);
+          if (msg.type === "data") {
+            const p: Point = { t: msg.ts, x: msg.x, y: msg.y, z: msg.z };
+            setLivePoints(prev => {
+              const next = [...prev, p].slice(-200);
+              return next;
+            });
+          } else if (msg.type === "heartbeat") {
+            const hb: HeartbeatPoint = { t: msg.ts, rssi: msg.rssi };
+            setLiveHeartbeat(hb);
+          }
+        } catch (e) {
+          // ignore malformed
+        }
+      };
+      return () => {
+        try { ws.close(); } catch (e) {}
+      };
+    } catch (e) {
+      // ignore
+    }
+  }, []);
 
   const load = async () => {
     try {
@@ -108,6 +146,28 @@ export default function Streams() {
       </div>
 
       <div className="bg-white border rounded p-3">
+        {/* Live stream panel */}
+        <div className="mb-4 p-2 border rounded bg-gray-50">
+          <div className="flex justify-between items-center mb-2">
+            <div className="text-sm text-gray-700 font-semibold">Live Stream</div>
+            <div className="text-xs text-gray-500">WebSocket</div>
+          </div>
+          <div className="flex items-center gap-4">
+            <div className="text-sm text-gray-600">Latest RSSI:</div>
+            <div className="text-sm font-mono">{liveHeartbeat ? liveHeartbeat.rssi : "—"}</div>
+            <div className="ml-6 text-sm text-gray-600">Latest Accel:</div>
+            <div className="text-sm font-mono">{livePoints.length ? `${livePoints[livePoints.length-1].x.toFixed(3)}, ${livePoints[livePoints.length-1].y.toFixed(3)}, ${livePoints[livePoints.length-1].z.toFixed(3)}` : "—"}</div>
+          </div>
+          <div className="mt-3">
+            {livePoints.length > 0 && (
+              <MultiSparkline series={[
+                { data: livePoints.map(p => p.x), color: '#ef4444', label: 'X' },
+                { data: livePoints.map(p => p.y), color: '#06b6d4', label: 'Y' },
+                { data: livePoints.map(p => p.z), color: '#10b981', label: 'Z' }
+              ]} />
+            )}
+          </div>
+        </div>
         {loading && <div className="text-sm text-gray-500">Loading…</div>}
         {!loading && points.length === 0 && heartbeatPoints.length === 0 && (
           <div className="text-sm text-gray-500">

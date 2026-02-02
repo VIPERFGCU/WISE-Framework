@@ -10,5 +10,11 @@
     "label": "bridge-esp32-001",
     "notes": "registered-by-agent",
     "last_seen": null
+  },
+  "sim-device-001": {
+    "device_id": "sim-device-001",
+    "label": "Simulated Test Device",
+    "notes": "Fake device simulator for testing",
+    "last_seen": null
   }
 }

@@ -198,6 +198,21 @@ async def _drain_mqtt_queue():
                     from app.services.influx import write_accel_point_sync
                     await asyncio.to_thread(write_accel_point_sync, reading, ts)
                     log.info(f"[Influx] Write Success: {reading.device_id} at {ts}")
+                    # Broadcast to websocket clients
+                    try:
+                        msg = {
+                            "type": "data",
+                            "topic": topic,
+                            "device_id": reading.device_id,
+                            "ts": ts.isoformat(),
+                            "x": reading.x,
+                            "y": reading.y,
+                            "z": reading.z,
+                        }
+                        for ws in list(active_clients):
+                            asyncio.create_task(_safe_send(ws, msg))
+                    except Exception:
+                        pass
                 except Exception as e:
                     log.error(f"[Influx] Write failed for {reading.device_id}: {e}")
 
@@ -219,6 +234,21 @@ async def _drain_mqtt_queue():
                         ts
                     )
                     log.info(f"[Influx] Heartbeat Write Success: {device_id} (rssi={hb.rssi})")
+                    # Broadcast heartbeat to websocket clients
+                    try:
+                        msg = {
+                            "type": "heartbeat",
+                            "topic": topic,
+                            "device_id": hb.device_id or device_id,
+                            "ts": ts.isoformat(),
+                            "rssi": hb.rssi,
+                            "uptime_s": hb.uptime_s,
+                            "fw": hb.fw,
+                        }
+                        for ws in list(active_clients):
+                            asyncio.create_task(_safe_send(ws, msg))
+                    except Exception:
+                        pass
                 except Exception as e:
                     log.error(f"[Influx] Heartbeat Write failed for {device_id}: {e}")
 
