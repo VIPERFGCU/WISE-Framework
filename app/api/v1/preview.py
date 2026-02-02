@@ -1,9 +1,8 @@
-from fastapi import APIRouter, Query, Depends, HTTPException
+from fastapi import APIRouter, Query, HTTPException
 from typing import Optional
 import asyncio
 import logging
 from app.services.influx import read_accel_series, read_heartbeat_series
-from app.deps import get_influx_query_api
 from pydantic import BaseModel
 
 log = logging.getLogger("sensor-backend")
@@ -17,16 +16,12 @@ class PreviewResponse(BaseModel):
 
 
 @router.get("/preview/{device_id}")
-async def preview(device_id: str, window_s: int = Query(60, ge=1, le=3600), query_api=Depends(get_influx_query_api)):
-    """Return accelerometer and heartbeat series for the given device over the last `window_s` seconds."""
+async def preview(device_id: str, window_s: int = Query(60, ge=1, le=3600)):
+    """Return accelerometer and heartbeat series for the given device over the last `window_s` seconds.
     
-    # If query_api is None (InfluxDB unavailable), return empty response
-    if query_api is None:
-        return {
-            "device_id": device_id,
-            "accel": None,
-            "heartbeat": None,
-        }
+    Note: InfluxDB queries are done directly without dependency injection to avoid blocking
+    when InfluxDB is unavailable.
+    """
     
     # Convert seconds to a Flux range shorthand
     if window_s < 60:
@@ -39,10 +34,10 @@ async def preview(device_id: str, window_s: int = Query(60, ge=1, le=3600), quer
     accel_data = None
     heartbeat_data = None
 
-    # Try accel with timeout
+    # Try accel with timeout (query_api will be created inside read_accel_series)
     try:
         accel_series = await asyncio.wait_for(
-            read_accel_series(device_id=device_id, range=rng, query_api=query_api),
+            read_accel_series(device_id=device_id, range=rng, query_api=None),
             timeout=5.0
         )
         accel_data = accel_series.model_dump()
@@ -51,10 +46,10 @@ async def preview(device_id: str, window_s: int = Query(60, ge=1, le=3600), quer
     except Exception as e:
         log.warning(f"[Preview] Accel query failed for {device_id}: {e}")
 
-    # Try heartbeat with timeout
+    # Try heartbeat with timeout (query_api will be created inside read_heartbeat_series)
     try:
         heartbeat_series = await asyncio.wait_for(
-            read_heartbeat_series(device_id=device_id, range=rng, query_api=query_api),
+            read_heartbeat_series(device_id=device_id, range=rng, query_api=None),
             timeout=5.0
         )
         heartbeat_data = heartbeat_series.model_dump()

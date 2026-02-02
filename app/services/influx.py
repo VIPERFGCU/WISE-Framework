@@ -1,6 +1,7 @@
 from __future__ import annotations
 from datetime import datetime
 from typing import List, Optional
+import logging
 
 from influxdb_client import InfluxDBClient, Point, WritePrecision
 from influxdb_client.client.write_api import SYNCHRONOUS, WriteApi
@@ -8,6 +9,8 @@ from influxdb_client.client.query_api import QueryApi
 
 from app.core.config import settings
 from app.schemas.sensor import SensorReading, AccelSeries, AccelPoint
+
+log = logging.getLogger("sensor-backend")
 
 
 # helpers
@@ -88,7 +91,18 @@ async def read_accel_series(
     Read a time series of accelerometer data over a Flux-style range string (e.g., "15m", "1hr").
     """
     if query_api is None:
-        query_api = _client.query_api()
+        # Create a query API with short timeout
+        try:
+            client = InfluxDBClient(
+                url=settings.influx_url,
+                token=settings.influx_token,
+                org=settings.influx_org,
+                timeout=2_000
+            )
+            query_api = client.query_api()
+        except Exception as e:
+            log.warning(f"Failed to create InfluxDB client: {e}")
+            raise
 
     flux = f"""
 from(bucket: "{settings.influx_bucket}")
@@ -132,7 +146,18 @@ async def read_heartbeat_series(
     from app.schemas.sensor import HeartbeatPoint, HeartbeatSeries
     
     if query_api is None:
-        query_api = _client.query_api()
+        # Create a query API with short timeout
+        try:
+            client = InfluxDBClient(
+                url=settings.influx_url,
+                token=settings.influx_token,
+                org=settings.influx_org,
+                timeout=2_000
+            )
+            query_api = client.query_api()
+        except Exception as e:
+            log.warning(f"Failed to create InfluxDB client: {e}")
+            raise
 
     flux = f"""
 from(bucket: "{settings.influx_bucket}")
