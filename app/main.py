@@ -16,7 +16,7 @@ from app.core.config import settings
 from app.deps import get_influx_client
 from app.services.influx import write_accel_point
 from app.schemas.sensor import SensorReading
-from app.mqtt import mqtt_client, publish_control
+from app.mqtt import mqtt_client, publish_control, set_connection_event
 
 # -------------------------------------------------------------------
 # App setup
@@ -130,6 +130,9 @@ def _paho_on_connect(client, userdata, flags, reason_code, properties=None):
     if reason_code == 0:
         log.info(f"[MQTT] Connected successfully, subscribing to devices/#")
         client.subscribe("devices/#")
+        # Signal that we're connected
+        if hasattr(_paho_on_connect, "_event"):
+            _paho_on_connect._event.set()
     else:
         log.error(f"[MQTT] Connection failed with code {reason_code}")
 
@@ -143,6 +146,11 @@ def _paho_on_message(client, userdata, msg):
         log.warning(f"[MQTT] Processing failed: {e}")
 
 def _mqtt_thread():
+    # Create an event for signaling connection
+    connection_event = threading.Event()
+    _paho_on_connect._event = connection_event  # type: ignore
+    set_connection_event(connection_event)
+    
     mqtt_client.on_connect = _paho_on_connect
     mqtt_client.on_message = _paho_on_message
     while True:
@@ -154,6 +162,7 @@ def _mqtt_thread():
             mqtt_client.loop_forever()
         except Exception as e:
             log.warning(f"[MQTT] Thread error: {type(e).__name__}: {e}; retrying in 2s")
+            connection_event.clear()
             time.sleep(2)
 
 # -------------------------------------------------------------------
