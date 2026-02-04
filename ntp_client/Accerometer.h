@@ -12,17 +12,23 @@
 #pragma once
 #include "ntp_client.h"
 // ================ Accelorometer Choice. Only enable 1 at a time ============
-#define USE_ISM 0
-#define USE_LSM 1
+#define USE_ISM 1
+#define USE_LSM 0
 // ================= ISM SENSOR CONFIG =====================
 #if USE_ISM
 // ---------------- SENSOR CALIBRATIION ---------------
-const float ACCEL_X_OFFSET = 0.11 - 0.007;
-const float ACCEL_X_SCALE = 0.101684;
-const float ACCEL_Y_OFFSET = -0.17 - 0.17;
-const float ACCEL_Y_SCALE = 0.101511;
-const float ACCEL_Z_OFFSET = 0.05;
-const float ACCEL_Z_SCALE = 0.102654;
+//const float ACCEL_X_OFFSET = 0.11 - 0.007;
+//const float ACCEL_X_SCALE = 0.101684;
+//const float ACCEL_Y_OFFSET = -0.17 - 0.17;
+//const float ACCEL_Y_SCALE = 0.101511;
+//const float ACCEL_Z_OFFSET = 0.05;
+//const float ACCEL_Z_SCALE = 0.102654;
+const float ACCEL_X_OFFSET = 0;
+const float ACCEL_X_SCALE = 1;
+const float ACCEL_Y_OFFSET = 0;
+const float ACCEL_Y_SCALE = 1;
+const float ACCEL_Z_OFFSET = 0;
+const float ACCEL_Z_SCALE = 1;
 // ---------------------------------------------------
 
 #include <Adafruit_ISM330DHCX.h>
@@ -53,18 +59,25 @@ void init_accelerometer() {
 #if USE_LSM
 
 // ---------------- SENSOR CALIBRATIION ---------------
+const float ACCEL_X_OFFSET = 0;
+const float ACCEL_X_SCALE = 2;
+const float ACCEL_Y_OFFSET = 0;
+const float ACCEL_Y_SCALE = 2;
+const float ACCEL_Z_OFFSET = 0;
+const float ACCEL_Z_SCALE = 2;
+
 //const float ACCEL_X_OFFSET = 0.17;
 //const float ACCEL_X_SCALE = 0.101808;
 //const float ACCEL_Y_OFFSET = -0.15;
 //const float ACCEL_Y_SCALE = 0.103007;
 //const float ACCEL_Z_OFFSET = 0.07;
 //const float ACCEL_Z_SCALE = 0.101463;
-const float ACCEL_X_OFFSET = 0.04;
-const float ACCEL_X_SCALE = 0.205407;
-const float ACCEL_Y_OFFSET = 0.04;
-const float ACCEL_Y_SCALE = 0.203206;
-const float ACCEL_Z_OFFSET = 0.03;
-const float ACCEL_Z_SCALE = 0.203442;
+//const float ACCEL_X_OFFSET = 0.04;
+//const float ACCEL_X_SCALE = 0.205407;
+//const float ACCEL_Y_OFFSET = 0.04;
+//const float ACCEL_Y_SCALE = 0.203206;
+//const float ACCEL_Z_OFFSET = 0.03;
+//const float ACCEL_Z_SCALE = 0.203442;
 // ---------------------------------------------------
 
 #include <Adafruit_LSM6DSOX.h>
@@ -105,10 +118,13 @@ struct TimeStampedAccelData {
   float az; // Z acceleration
 };
 
-void create_timestamped_accel_data(TimeStampedAccelData &data_struct, const float &raw_x, const float &raw_y,const float &raw_z) {
-  data_struct.timestamp = getEpochTime() * 1000ULL; // convert microseconds to nanoseconds
+void create_timestamped_accel_data(TimeStampedAccelData &data_struct, 
+                                   const float &raw_x, const float &raw_y,
+                                   const float &raw_z) {
+  data_struct.timestamp = getEpochTime();  // microseconds since epoch
   data_struct.ax = (raw_x - ACCEL_X_OFFSET) * ACCEL_X_SCALE;
   data_struct.ay = (raw_y - ACCEL_Y_OFFSET) * ACCEL_Y_SCALE;
   data_struct.az = (raw_z - ACCEL_Z_OFFSET) * ACCEL_Z_SCALE;
 }
+
 // ====================================

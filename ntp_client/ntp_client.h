@@ -19,7 +19,7 @@ const int NTP_PACKET_SIZE = 48;
 byte packetBuffer[NTP_PACKET_SIZE];
 //IPAddress ntpServer(192,168,0,2); // The esp32 ntp server
 //IPAddress ntpServer(129, 6, 15, 26); // nist ntp server. time.google.com has blocked me as well as nist servers: 129.6.15.28 and 129.6.15.29
-IPAddress ntpServer(10,100,100,148);  // Local ntp server( on linux )
+IPAddress ntpServer(10,100,100,1);  // Local ntp server( on linux )
 // =========================
 // ====TIME SETTINGS=====
 const long  gmtOffset_sec = 0;     // Set your timezone offset in seconds
@@ -28,20 +28,32 @@ const int   daylightOffset_sec = 0;
 volatile time_t currentTime = 0;   
 volatile uint32_t lastPpsMicros = 0;
 volatile bool ppsFlag = true; // Start with pps disabled
+volatile uint32_t microsecondAccumulator = 0;
 // ======================
 
-SemaphoreHandle_t timerMux; // So time does not change during ntp request processing
+portMUX_TYPE timerMux = portMUX_INITIALIZER_UNLOCKED;
 
 void IRAM_ATTR onPPS() {
-  BaseType_t xHigherPriorityTaskWoken = pdFALSE;
-  if (xSemaphoreTakeFromISR(timerMux, &xHigherPriorityTaskWoken) == pdTRUE && !ppsFlag) {
-    uint32_t ppsMicros = micros();
-    currentTime += int((ppsMicros - lastPpsMicros) / 1000);  // Floor divide by the last updated time to account for time passed since pps was updated  
-//    currentTime++;                 
-    lastPpsMicros = ppsMicros;     
-    ppsFlag = true;
-    xSemaphoreGiveFromISR(timerMux, &xHigherPriorityTaskWoken);
+  portENTER_CRITICAL_ISR(&timerMux);
+  uint32_t ppsMicros = micros();
+
+  // Calculate the delta using unsigned math (handles micros() wrapping)
+  uint32_t deltaMicros = ppsMicros - lastPpsMicros;
+
+  microsecondAccumulator += deltaMicros;
+
+  time_t secondsToAdd = 0;
+  // Add as many full seconds as we have accumulated
+  while (microsecondAccumulator >= 1000000) {
+    secondsToAdd++;
+    microsecondAccumulator -= 1000000; // Subtract one second
   }
+
+  currentTime += secondsToAdd;
+  
+  lastPpsMicros = ppsMicros;
+  ppsFlag = true;
+  portEXIT_CRITICAL_ISR(&timerMux);
 }
 
 void init_time_task() {
@@ -54,29 +66,28 @@ void init_time_task() {
       delay(1000);
       continue;
     }
+    portENTER_CRITICAL(&timerMux);
     lastPpsMicros = micros();
-    xSemaphoreTake(timerMux, portMAX_DELAY);
     ppsFlag = false;
-    xSemaphoreGive(timerMux);
+    portEXIT_CRITICAL(&timerMux);
     
-
     Serial.println("Waiting for pps pulse.");
     // Wait for PPS pulse
     bool ppsSeen = false;
     while (!ppsSeen) {
-      xSemaphoreTake(timerMux, portMAX_DELAY);
+      portENTER_CRITICAL(&timerMux);
       ppsSeen = ppsFlag;
-      xSemaphoreGive(timerMux);
-      delay(10);
+      portEXIT_CRITICAL(&timerMux);
+      delay(20);
     }
 
-    xSemaphoreTake(timerMux, portMAX_DELAY);
+    portENTER_CRITICAL(&timerMux);
     currentTime = now;  // We update the time after the pps flag indicates that the next second has begun
-    uint32_t ppsMicros = micros();
-    currentTime += int((ppsMicros - lastPpsMicros) / 1000);  // Floor divide by the last updated time to account for time passed since pps was updated         
-    lastPpsMicros = ppsMicros;
-    ppsFlag = false;
-    xSemaphoreGive(timerMux);
+//    uint32_t ppsMicros = micros();
+//    currentTime += int((ppsMicros - lastPpsMicros) / 1000);  // Floor divide by the last updated time to account for time passed since pps was updated         
+//    lastPpsMicros = ppsMicros;
+//    ppsFlag = false;
+    portEXIT_CRITICAL(&timerMux);
 
     Serial.printf("Time set to %ld at micros %u\n", currentTime, lastPpsMicros);
 
@@ -88,11 +99,8 @@ void init_time_task() {
 
 
 void ntp_setup() {
-  timerMux = xSemaphoreCreateBinary();
-  xSemaphoreGive(timerMux);
-
   // Setup PPS pin interrupt
-  pinMode(PPS_PIN, INPUT_PULLUP);
+  pinMode(PPS_PIN, INPUT);
   attachInterrupt(digitalPinToInterrupt(PPS_PIN), onPPS, RISING);
   
   // Create init_time task
@@ -156,14 +164,13 @@ time_t getNtpTime(IPAddress& ntpServer) {
 // ===================================
 // ========== TIME RETRIEVAL =========
 uint64_t getEpochTime() {
-  xSemaphoreTake(timerMux, portMAX_DELAY);
+  portENTER_CRITICAL(&timerMux);
   time_t baseTime = currentTime;          // seconds since epoch
   uint32_t ppsMicros = lastPpsMicros;    // micros() timestamp at last PPS pulse
-  xSemaphoreGive(timerMux);
+  portEXIT_CRITICAL(&timerMux);
 
   uint32_t nowMicros = micros();
 
-  // Calculate microseconds elapsed since last PPS pulse, handling micros() overflow
   uint32_t deltaMicros;
   if (nowMicros >= ppsMicros) {
     deltaMicros = nowMicros - ppsMicros;
@@ -171,8 +178,6 @@ uint64_t getEpochTime() {
     deltaMicros = (0xFFFFFFFF - ppsMicros) + nowMicros;
   }
 
-  // Combine seconds and microseconds into uint64_t microseconds since epoch
-  uint64_t epochMicros = ((uint64_t)baseTime * 1000000ULL) + deltaMicros;
-
-  return epochMicros;
+  // microseconds since epoch
+  return ((uint64_t)baseTime * 1000000ULL) + deltaMicros;
 }
