@@ -4,7 +4,7 @@
 // ==== MQTT ====
 #define MQTT_ENDPOINT(base, deviceID, suffix) (String(base) + "/" + deviceID + "/" + suffix)
 // --------------
-const char* MQTT_SERVER = "8.0.0.8";
+const char* MQTT_SERVER = "10.100.100.1";
 const int MQTT_PORT = 1883;
 
 // Fixed: Store String to ensure pointer remains valid
@@ -31,11 +31,12 @@ void setup_mqtt() {
   // Important: Increase MQTT internal buffer to handle large batch packets
   client.setBufferSize(5120); 
   reconnect();
+  assign_id();
 }
 
 void assign_id() {
   if( sensor_id != "" ) {
-    return; // ID is already assigned( Shouldn't reach here anyways )
+    return; // ID is already assigned.
   }
   // Temporaily set the id to be the MAC address
   sensor_id = WiFi.macAddress();
@@ -81,9 +82,12 @@ void on_message_recieved(char* topic, byte* payload, unsigned int length) {
     sensor_id = doc["payload"].as<String>();;
     device_endpoint = MQTT_ENDPOINT("mesh", sensor_id, "command").c_str();
     client.subscribe(device_endpoint);
+  } else if(strcmp(type, "heartbeat")) {
+    //do something here
   }
 }
 
+extern const int MS_INTERVAL;
 const int BUFFER_SIZE = 100; // Fixed: Changed float to int
 struct BatchedAccelData {
   int cnt = 0;  // How full the accel data arrays are
@@ -98,7 +102,7 @@ void transmit_accelerometer_data(const TimeStampedAccelData &accel_data) {
   // Initialize batch timestamp on first entry
   if(transmit_buffer.cnt == 0) {
     transmit_buffer.timestamp = accel_data.timestamp;
-    transmit_buffer.interval = 20; // Hardcoded MS_INTERVAL matching main
+    transmit_buffer.interval = MS_INTERVAL; // Hardcoded MS_INTERVAL matching main
   }
 
   // Store data in buffer
@@ -117,6 +121,7 @@ void transmit_accelerometer_data(const TimeStampedAccelData &accel_data) {
   out["id"] = sensor_id;
   out["type"] = "data";
   out["t_start"] = transmit_buffer.timestamp;
+  out["interval"] = transmit_buffer.interval;
 
   // Send out the x,y,z data
   JsonArray array = out.createNestedArray("vals");
@@ -133,9 +138,7 @@ void transmit_accelerometer_data(const TimeStampedAccelData &accel_data) {
   // Transmit the data
   size_t n = serializeJson(out, json_transmit_buffer);
   
-  if (client.connected()) {
-      client.publish(MQTT_GATEWAY, json_transmit_buffer, n); 
-  }
+  client.publish(MQTT_GATEWAY, json_transmit_buffer, n); 
   
   // Reset buffer count
   transmit_buffer.cnt = 0;

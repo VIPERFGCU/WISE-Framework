@@ -5,7 +5,7 @@
 #include "mqtt_client.h"
 
 //# define USE_OLD  // the http influxdb handler
-//#include "influx_db_handler.h"
+#include "influx_db_handler.h"
 
 // ================== WIFI CONFIGURATION ===================
 const char* ssid = "pop-os";
@@ -13,23 +13,21 @@ const char* password = "adminnnn";
 // ======================================================================
 const int MS_INTERVAL = 20; // 20ms per record
 
-QueueHandle_t dataQueue;
-const int queueSize = 200; // Increased to accommodate buffering during network lag
-
 hw_timer_t * timer = NULL;
 
 // Handle for the task running on Core 0
 TaskHandle_t mqttTaskHandle;
 
 float raw_data[3];
+bool isr_timer_fired = false;
+portMUX_TYPE accel_timerMux = portMUX_INITIALIZER_UNLOCKED;
+
 void IRAM_ATTR onTimer() {
-  get_accelerometer_data(raw_data);
-  TimeStampedAccelData A;
-  create_timestamped_accel_data(A, raw_data[0], raw_data[1], raw_data[2]);
-
+  portENTER_CRITICAL_ISR(&accel_timerMux);
+  isr_timer_fired = true;
+  portEXIT_CRITICAL_ISR(&accel_timerMux);
+  
   BaseType_t xHigherPriorityTaskWoken = pdFALSE;
-  xQueueSendFromISR(dataQueue, &A, &xHigherPriorityTaskWoken);
-
   // If a task was waiting for this data, ensure it switches context if needed
   if (xHigherPriorityTaskWoken) {
     portYIELD_FROM_ISR();
@@ -38,11 +36,10 @@ void IRAM_ATTR onTimer() {
 
 // Dedicated Task for MQTT (Core 0)
 void mqttTask(void * parameter) {
-  setup_mqtt();  
+  setup_mqtt();
 
-  TimeStampedAccelData receivedData;
-
-  for(;;) {
+  bool timer_fired = false;
+  while(true) {
     // Maintain MQTT connection
     if (!client.connected()) {
       reconnect();
@@ -50,8 +47,17 @@ void mqttTask(void * parameter) {
     client.loop();
 
     // Process queue
-    if (xQueueReceive(dataQueue, &receivedData, 0) == pdPASS) {
-      transmit_accelerometer_data(receivedData);
+    portENTER_CRITICAL(&accel_timerMux);
+    timer_fired = isr_timer_fired;
+    isr_timer_fired = false;
+    portEXIT_CRITICAL(&accel_timerMux);
+    
+    if (timer_fired) {
+      get_accelerometer_data(raw_data);
+      TimeStampedAccelData A;
+      create_timestamped_accel_data(A, raw_data[0], raw_data[1], raw_data[2]);
+
+      transmit_accelerometer_data(A);
     }
     
     // Small yield to prevent watchdog trigger if queue is empty for long periods
@@ -61,9 +67,6 @@ void mqttTask(void * parameter) {
 
 void setup(){
   Serial.begin(115200);
-
-  // Create queue large enough to hold data while batch is sending
-  dataQueue = xQueueCreate(queueSize, sizeof(TimeStampedAccelData));
 
   WiFi.begin(ssid, password);
 
@@ -87,7 +90,8 @@ void setup(){
 
   timer = timerBegin(1000000);  // 1Mhz
   timerAttachInterrupt(timer, &onTimer);
-  timerAlarm(timer, MS_INTERVAL*1000, true, 0);
+  timerAlarm(timer, MS_INTERVAL, true, 0);
+  timerStart(timer);
 
   Serial.println("Setup Complete");
 }

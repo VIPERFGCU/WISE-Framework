@@ -73,7 +73,7 @@ void init_time_task() {
     
     Serial.println("Waiting for pps pulse.");
     // Wait for PPS pulse
-    bool ppsSeen = false;
+    bool ppsSeen = true;
     while (!ppsSeen) {
       portENTER_CRITICAL(&timerMux);
       ppsSeen = ppsFlag;
@@ -100,7 +100,7 @@ void init_time_task() {
 
 void ntp_setup() {
   // Setup PPS pin interrupt
-  pinMode(PPS_PIN, INPUT);
+  pinMode(PPS_PIN, INPUT_PULLDOWN);
   attachInterrupt(digitalPinToInterrupt(PPS_PIN), onPPS, RISING);
   
   // Create init_time task

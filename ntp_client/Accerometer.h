@@ -31,6 +31,7 @@ const float ACCEL_Z_OFFSET = 0;
 const float ACCEL_Z_SCALE = 1;
 // ---------------------------------------------------
 
+
 #include <Adafruit_ISM330DHCX.h>
 Adafruit_ISM330DHCX ism330dhcx;
 void get_accelerometer_data(float data[3]) {
@@ -48,11 +49,16 @@ void get_accelerometer_data(float data[3]) {
 void init_accelerometer() {
   if(!ism330dhcx.begin_I2C()) {
     Serial.println("Failed to find ism330dhcx accelemeter");
-    delay(100);  
+    while (1) {
+      delay(10);
+    }
   };
   ism330dhcx.setAccelDataRate(LSM6DS_RATE_104_HZ);
   ism330dhcx.setAccelRange(LSM6DS_ACCEL_RANGE_4_G);
-}
+  
+//  ism330dhcx.configInt1(false, false, true); // accelerometer DRDY on INT1
+//  ism330dhcx.configInt2(false, true, false); // gyro DRDY on INT2
+ }
 #endif
 // ===================================================
 // ===================== LSM SENSOR CONFIG =================
