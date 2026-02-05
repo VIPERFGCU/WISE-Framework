@@ -8,7 +8,7 @@ def now_iso(): return datetime.now(timezone.utc).isoformat()
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--id", required=True)
-    ap.add_argument("--broker", default="localhost")
+    ap.add_argument("--broker", default="wise-net.io")
     ap.add_argument("--port", type=int, default=1883)
     args = ap.parse_args()
 

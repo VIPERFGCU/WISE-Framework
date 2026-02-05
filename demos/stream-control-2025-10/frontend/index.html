@@ -33,7 +33,7 @@
   <div class="card">
     <div class="row">
       <label>API Base</label>
-      <input id="apiBase" size="36" placeholder="http://localhost:8000"/>
+      <input id="apiBase" size="36" placeholder="http://wise-net.io:8000"/>
       <label style="margin-left:.5rem;">API Key</label>
       <input id="apiKey" size="24" placeholder="devkey"/>
       <button id="saveAuth">Save</button>
@@ -100,7 +100,7 @@ const authStatus  = document.getElementById('authStatus');
 const showAllCb   = document.getElementById('showAll');
 
 /* ---------- state ---------- */
-let API_BASE = localStorage.getItem('demo.apiBase') || 'http://localhost:8000';
+let API_BASE = localStorage.getItem('demo.apiBase') || 'http://wise-net.io:8000';
 let API_KEY  = localStorage.getItem('demo.apiKey')  || 'devkey';
 apiBaseEl.value = API_BASE;
 apiKeyEl.value  = API_KEY;

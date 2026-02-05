@@ -9,7 +9,7 @@ import paho.mqtt.client as mqtt
 
 def parse_args():
     ap = argparse.ArgumentParser(description="Run WISENET fake device simulators")
-    ap.add_argument("--broker", default="localhost")
+    ap.add_argument("--broker", default="wise-net.io")
     ap.add_argument("--port", type=int, default=1883)
     ap.add_argument("--devices", default="sim-device-001,esp32-test-01")
     ap.add_argument("--script", default=str(Path(__file__).resolve().parents[1] / "demos/stream-control-2025-10/simulators/fake_device.py"))

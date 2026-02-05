@@ -13,7 +13,7 @@ from threading import Thread, Event
 # Config
 MQTT_HOST = os.getenv("MQTT_HOST", "10.0.0.155")  # Real broker
 MQTT_PORT = int(os.getenv("MQTT_PORT", "1883"))
-API_URL = "http://localhost:8000"
+API_URL = "http://wise-net.io:8000"
 DEVICE_ID = "bridge-esp32-001"
 
 # Track messages received

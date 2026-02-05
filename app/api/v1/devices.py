@@ -23,7 +23,7 @@ router = APIRouter(prefix="/api/v1/devices", tags=["devices"])
 _mqtt_status_cache: Dict[str, Dict[str, Any]] = {}
 _cache_lock = threading.Lock()
 
-MQTT_HOST = os.getenv("MQTT_HOST", "localhost")
+MQTT_HOST = os.getenv("MQTT_HOST", "wise-net.io")
 MQTT_PORT = int(os.getenv("MQTT_PORT", "1883"))
 _STATUS_SUB = "devices/+/status"
 

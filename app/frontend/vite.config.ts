@@ -8,11 +8,11 @@ export default defineConfig({
      proxy: {
 	//Anything starting with /api goes to FastAPI
 	'/api': {
-		target: 'http://localhost:8000',
+		target: 'http://wise-net.io:8000',
 		changeOrigin: true,
        },
        '/health':{
-	       target: 'http://localhost:8000',
+	       target: 'http://wise-net.io:8000',
 	       changeOrigin: true,
        },
      },

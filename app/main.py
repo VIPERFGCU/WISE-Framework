@@ -40,12 +40,12 @@ log = logging.getLogger("sensor-backend")
 # -------------------------------------------------------------------
 raw_origins = settings.cors_allow_origins
 if isinstance(raw_origins, str):
-    # support comma-separated env like: "http://localhost:5173,http://127.0.0.1:5173"
+    # support comma-separated env like: "http://wise-net.io:5173,http://127.0.0.1:5173"
     origins = [o.strip() for o in raw_origins.split(",") if o.strip()]
 elif isinstance(raw_origins, (list, tuple)):
     origins = list(raw_origins)
 else:
-    origins = ["http://localhost:5173", "http://127.0.0.1:5173"]
+    origins = ["http://wise-net.io:5173", "http://127.0.0.1:5173"]
 
 app.add_middleware(
     CORSMiddleware,
