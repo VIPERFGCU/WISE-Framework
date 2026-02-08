@@ -18,6 +18,7 @@ from app.deps import get_influx_client
 from app.services.influx import write_accel_point, write_heartbeat_sync
 from app.schemas.sensor import SensorReading, DeviceHeartbeat
 from app.mqtt import mqtt_client, publish_control, set_connection_event
+from app.services import devices as devices_svc
 
 # -------------------------------------------------------------------
 # App setup
@@ -130,8 +131,9 @@ ENABLE_MQTT = os.getenv("ENABLE_MQTT", "true").lower() == "true"
 
 def _paho_on_connect(client, userdata, flags, reason_code, properties=None):
     if reason_code == 0:
-        log.info(f"[MQTT] Connected successfully, subscribing to devices/#")
+        log.info(f"[MQTT] Connected successfully, subscribing to devices/# and mesh/#")
         client.subscribe("devices/#")
+        client.subscribe("mesh/#")
         # Signal that we're connected
         if hasattr(_paho_on_connect, "_event"):
             _paho_on_connect._event.set()
@@ -170,11 +172,81 @@ def _mqtt_thread():
         time.sleep(1)
 
 # -------------------------------------------------------------------
-# MQTT Consumer -> InfluxDB + WebSocket fan-out
+# WebSocket and Mesh Protocol Helpers
+# -------------------------------------------------------------------
+async def _safe_send(ws: WebSocket, msg: dict):
+    """Safely send a WebSocket message, handling closed connections."""
+    try:
+        await ws.send_json(msg)
+    except Exception as e:
+        log.debug(f"[WS] Send failed: {e}")
+
+def _process_mesh_data_message(data: dict, device_mac: str) -> list[SensorReading]:
+    """
+    Convert mesh protocol batched data to individual SensorReading objects.
+    
+    Input format (from firmware):
+    {
+        "id": "device_mac_address",
+        "type": "data",
+        "t_start": 1707432851000000,  # microseconds since epoch
+        "interval": 20000,             # microseconds between samples
+        "vals": [[x1,y1,z1], [x2,y2,z2], ...]
+    }
+    
+    Output: List of SensorReading objects with individual timestamps
+    """
+    readings = []
+    try:
+        t_start_us = data.get("t_start", 0)
+        interval_us = data.get("interval", 0)
+        vals = data.get("vals", [])
+        device_id = data.get("id", device_mac)
+        
+        for idx, (x, y, z) in enumerate(vals):
+            # Calculate timestamp for this sample
+            ts_us = t_start_us + (idx * interval_us)
+            ts = datetime.fromtimestamp(ts_us / 1_000_000, tz=timezone.utc)
+            
+            reading = SensorReading(
+                device_id=device_id,
+                x=float(x),
+                y=float(y),
+                z=float(z),
+                ts=ts
+            )
+            readings.append(reading)
+    except Exception as e:
+        log.error(f"[Mesh] Failed to process data message: {e}")
+    
+    return readings
+
+def _process_mesh_assignment(data: dict) -> str:
+    """
+    Handle device assignment message from mesh protocol.
+    
+    Input format:
+    {
+        "id": "device_mac_address",
+        "type": "client_assignment"
+    }
+    
+    Returns: The device_id (MAC address)
+    """
+    device_id = data.get("id")
+    if device_id:
+        # Auto-register the device
+        try:
+            devices_svc.register(device_id, label=device_id, notes="auto-registered-mesh-protocol")
+            log.info(f"[Mesh] Auto-registered device: {device_id}")
+        except Exception as e:
+            log.error(f"[Mesh] Failed to register device {device_id}: {e}")
+    return device_id
+
 # -------------------------------------------------------------------
 async def _drain_mqtt_queue():
     """Consume messages placed on the thread-safe queue by the Paho callbacks.
-    Processes both /data (sensor readings) and /heartbeat topics.
+    Processes both devices/* (standard protocol) and mesh/* (batch protocol) topics.
     """
     while True:
         try:
@@ -188,8 +260,9 @@ async def _drain_mqtt_queue():
             parts = topic.split("/")
             device_id = parts[1] if len(parts) >= 2 else "unknown"
 
-            # Handle sensor data messages
-            if topic.endswith("/data"):
+            # ===== DEVICES/* PROTOCOL =====
+            # Handle sensor data messages (devices/{id}/data)
+            if topic.startswith("devices/") and topic.endswith("/data"):
                 data["device_id"] = data.get("device_id") or device_id
                 ts_str = data.get("ts")
                 ts = (datetime.fromisoformat(ts_str.replace("Z", "+00:00"))
@@ -218,8 +291,8 @@ async def _drain_mqtt_queue():
                 except Exception as e:
                     log.error(f"[Influx] Write failed for {reading.device_id}: {e}")
 
-            # Handle heartbeat messages
-            elif topic.endswith("/heartbeat"):
+            # Handle heartbeat messages (devices/{id}/heartbeat)
+            elif topic.startswith("devices/") and topic.endswith("/heartbeat"):
                 data["device_id"] = data.get("device_id") or device_id
                 ts_str = data.get("ts")
                 ts = (datetime.fromisoformat(ts_str.replace("Z", "+00:00"))
@@ -254,8 +327,57 @@ async def _drain_mqtt_queue():
                 except Exception as e:
                     log.error(f"[Influx] Heartbeat Write failed for {device_id}: {e}")
 
+            # ===== MESH/* PROTOCOL =====
+            # Handle mesh protocol client assignment (device registration)
+            elif topic == "mesh" or topic.endswith("/"):
+                msg_type = data.get("type")
+                
+                if msg_type == "client_assignment":
+                    # Register the device
+                    registered_device_id = _process_mesh_assignment(data)
+                    # Touch last seen time
+                    if registered_device_id:
+                        devices_svc.touch_last_seen(registered_device_id)
+                    log.info(f"[Mesh] Device assignment processed: {registered_device_id}")
+                
+                elif msg_type == "data":
+                    # Convert mesh batched format to individual readings
+                    device_mac = data.get("id", device_id)
+                    readings = _process_mesh_data_message(data, device_mac)
+                    
+                    if readings:
+                        from app.services.influx import write_accel_point_sync
+                        for reading in readings:
+                            try:
+                                await asyncio.to_thread(write_accel_point_sync, reading, reading.ts)
+                                log.info(f"[Influx] Mesh Write Success: {reading.device_id} at {reading.ts}")
+                                
+                                # Broadcast to websocket clients
+                                try:
+                                    msg = {
+                                        "type": "data",
+                                        "topic": f"mesh/{device_mac}/data",
+                                        "device_id": reading.device_id,
+                                        "ts": reading.ts.isoformat(),
+                                        "x": reading.x,
+                                        "y": reading.y,
+                                        "z": reading.z,
+                                    }
+                                    for ws in list(active_clients):
+                                        asyncio.create_task(_safe_send(ws, msg))
+                                except Exception:
+                                    pass
+                            except Exception as e:
+                                log.error(f"[Influx] Mesh Write failed for {reading.device_id}: {e}")
+                        
+                        # Touch last seen for this device
+                        if readings:
+                            devices_svc.touch_last_seen(readings[-1].device_id, readings[-1].ts)
+                else:
+                    log.debug(f"[Mesh] Ignoring unknown message type: {msg_type} on {topic}")
+            
             else:
-                log.debug(f"[MQTT] Ignoring non-data/heartbeat message on {topic}")
+                log.debug(f"[MQTT] Ignoring message on {topic}")
 
         except Exception as e:
             log.error(f"[Drain Error] Failed to process {topic}: {e}")
