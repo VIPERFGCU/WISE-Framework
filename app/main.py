@@ -201,7 +201,7 @@ def _process_mesh_data_message(data: dict, device_mac: str) -> list[SensorReadin
         t_start_us = data.get("t_start", 0)
         interval_us = data.get("interval", 0)
         vals = data.get("vals", [])
-        device_id = data.get("id", device_mac)
+        device_id = data.get("device_id") or data.get("id", device_mac)
         
         for idx, (x, y, z) in enumerate(vals):
             # Calculate timestamp for this sample
@@ -233,7 +233,7 @@ def _process_mesh_assignment(data: dict) -> str:
     
     Returns: The device_id (MAC address)
     """
-    device_id = data.get("id")
+    device_id = data.get("device_id") or data.get("id")
     if device_id:
         # Auto-register the device
         try:
