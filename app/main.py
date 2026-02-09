@@ -202,6 +202,8 @@ def _process_mesh_data_message(data: dict, device_mac: str) -> list[SensorReadin
         interval_us = data.get("interval", 0)
         vals = data.get("vals", [])
         device_id = data.get("device_id") or data.get("id", device_mac)
+        # Normalize to string to prevent duplicates (e.g., 1 vs "1")
+        device_id = str(device_id)
         
         for idx, (x, y, z) in enumerate(vals):
             # Calculate timestamp for this sample
@@ -235,6 +237,8 @@ def _process_mesh_assignment(data: dict) -> str:
     """
     device_id = data.get("device_id") or data.get("id")
     if device_id:
+        # Normalize to string to prevent duplicates (e.g., 1 vs "1")
+        device_id = str(device_id)
         # Auto-register the device
         try:
             devices_svc.register(device_id, label=device_id, notes="auto-registered-mesh-protocol")
@@ -263,7 +267,7 @@ async def _drain_mqtt_queue():
             # ===== DEVICES/* PROTOCOL =====
             # Handle sensor data messages (devices/{id}/data)
             if topic.startswith("devices/") and topic.endswith("/data"):
-                data["device_id"] = data.get("device_id") or device_id
+                data["device_id"] = str(data.get("device_id") or device_id)
                 ts_str = data.get("ts")
                 ts = (datetime.fromisoformat(ts_str.replace("Z", "+00:00"))
                       if ts_str else datetime.now(timezone.utc))
@@ -293,7 +297,7 @@ async def _drain_mqtt_queue():
 
             # Handle heartbeat messages (devices/{id}/heartbeat)
             elif topic.startswith("devices/") and topic.endswith("/heartbeat"):
-                data["device_id"] = data.get("device_id") or device_id
+                data["device_id"] = str(data.get("device_id") or device_id)
                 ts_str = data.get("ts")
                 ts = (datetime.fromisoformat(ts_str.replace("Z", "+00:00"))
                       if ts_str else datetime.now(timezone.utc))
