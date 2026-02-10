@@ -11,7 +11,7 @@
 const char* ssid = "pop-os";
 const char* password = "adminnnn";
 // ======================================================================
-const int MS_INTERVAL = 20; // 20ms per record
+const int MS_INTERVAL = 500; // 500ms per record
 
 hw_timer_t * timer = NULL;
 
