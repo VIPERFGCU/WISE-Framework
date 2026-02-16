@@ -73,12 +73,23 @@ def on_cloud_message(client, userdata, msg):
     # Check if payload contains OTA command
     try:
         cmd = json.loads(msg.payload.decode())
+           # Check for OTA Command
         if cmd.get("cmd") == "OTA":
-            # Command Root Node to start OTA
-            # URL of file on pi
-            ota_url = f"http://{cmd.get('ip', '10.0.0.194')}:8000/fgcu-esp32.bin"
+            # 1. Try to get the full URL from the payload
+            ota_url = cmd.get("url")
+            
+            # 2. If no URL, build a default one (Safe Fallback)
+            if not ota_url:
+                target_ip = cmd.get("ip", "10.10.10.1") # Default to Mesh Gateway IP
+                filename = cmd.get("file", "update.bin")
+                ota_url = f"http://{target_ip}:8000/{filename}"
+            
+            # 3. Publish to Mesh
             local_client.publish(LOCAL_OTA_CMD_TOPIC, ota_url)
             print(f"[OTA] Triggered Root Update: {ota_url}")
+            
+    except Exception as e:
+        print(f"[ERROR] Failed to process cloud command: {e}")
     except:
         pass
 

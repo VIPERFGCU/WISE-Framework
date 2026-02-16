@@ -14,6 +14,9 @@
 #include "esp_https_ota.h"
 #include "esp_ota_ops.h"
 #include "esp_netif.h"
+#include "esp_crt_bundle.h"
+void ota_task(void *pvParameter);
+void broadcast_ota_to_mesh(void *arg);
 
 // --- CONFIG ---
 #define PI_IP_ADDRESS "10.10.10.1"
@@ -58,13 +61,32 @@ static void mqtt_event_handler(void *handler_args, esp_event_base_t base, int32_
     case MQTT_EVENT_CONNECTED:
         ESP_LOGI(TAG, "[ROOT] MQTT Connected");
         mqtt_connected = true;
+        // SUBSCRIBE to the OTA Command Topic
+        esp_mqtt_client_subscribe(mqtt_client, "mesh/ota/command", 0);
+        // Subscribe to the Propogate command.
+        esp_mqtt_client_subscribe(mqtt_client, "mesh/ota/propagate", 0);
         break;
+        
+    case MQTT_EVENT_DATA:
+        // Check if the message is for OTA
+        if (strncmp(event->topic, "mesh/ota/command", event->topic_len) == 0) {
+            char url[128];
+            snprintf(url, event->data_len + 1, "%.*s", event->data_len, event->data);
+            ESP_LOGW(TAG, "[OTA] Received Command! Downloading from: %s", url);
+            // Start the Download Task
+            xTaskCreate(ota_task, "ota_task", 8192, strdup(url), 5, NULL);
+        }
+        // Check for PROPAGATE Command for Child sensors.
+        else if (strncmp(event->topic, "mesh/ota/propagate", event->topic_len) == 0) {
+            ESP_LOGW(TAG, "[OTA] Received Propagate Command! Starting Mesh Broadcast...");
+            // Running as a task to avoid blocking the MQTT handler
+            xTaskCreate(broadcast_ota_to_mesh, "mesh_broadcast", 8192, NULL, 5, NULL);
+        }
+        break;
+        
     case MQTT_EVENT_DISCONNECTED:
         ESP_LOGW(TAG, "[ROOT] MQTT Disconnected");
         mqtt_connected = false;
-        break;
-    case MQTT_EVENT_ERROR:
-        ESP_LOGE(TAG, "[ROOT] MQTT Error");
         break;
     default: break;
     }
@@ -102,7 +124,7 @@ void data_task(void *arg) {
         vTaskDelay(pdMS_TO_TICKS(5000)); // Slow down to 5s for debugging
         packet_counter++;
         snprintf(payload, sizeof(payload), 
-                 "{\"id\":\"%s\",\"type\":\"data\",\"msg_id\":%lu,\"val\":[%.2f,%.2f,%.2f]}", 
+                 "{\"id\":\"%s\",\"v\":2,\"type\":\"data\",\"msg_id\":%lu,\"val\":[%.2f,%.2f,%.2f]}", //need to fix this 'v' to be dynamically changed per firmware version.
                  device_id, (unsigned long)packet_counter,
                  (float)(esp_random() % 100) / 10.0,
                  (float)(esp_random() % 100) / 10.0,
@@ -119,7 +141,7 @@ void mesh_ota_receiver_logic(uint8_t *incoming_data, size_t len) {
     static const esp_partition_t *update_partition = NULL;
     
     if (packet->type == 1) { // OTA START
-        ESP_LOGI(TAG, "OTA Start. Total Size: %lu", (unbsigned long)packet->total_size);
+        ESP_LOGI(TAG, "OTA Start. Total Size: %lu", (unsigned long)packet->total_size);
         update_partition = esp_ota_get_next_update_partition(NULL);
         if (update_partition == NULL) {
             ESP_LOGE(TAG, "OTA Passive Partition not found.");
@@ -154,7 +176,7 @@ void mesh_p2p_rx_task(void *arg) {
         if (esp_mesh_recv(&from, &data, portMAX_DELAY, &flag, NULL, 0) == ESP_OK) {
             
             //Peek at first byte to check type.
-            uint8_t packet-type = data.data[0];
+            uint8_t packet_type = data.data[0];
 
             if (packet_type >= 1 && packet_type <= 3){
                 //It is an OTA packet
@@ -212,6 +234,7 @@ void mesh_event_handler(void *arg, esp_event_base_t event_base, int32_t event_id
         } else {
             is_root = false;
             ESP_LOGI(TAG, ">>> I AM NODE <<<");
+            xTaskCreate(mesh_p2p_rx_task, "p2p_rx", 3072, NULL, 5, NULL);
         }
         break;
     case MESH_EVENT_PARENT_DISCONNECTED:
@@ -228,22 +251,42 @@ void mesh_event_handler(void *arg, esp_event_base_t event_base, int32_t event_id
 
 
 // Theoretical Root Broadcaster Implementation
-/* 
-Called by root after it finishes its own OTA download.
-It reads the firmware from the partition it just wrote to and broadcasts it.
-*/
-void broadcast_ota_to_mesh() {
-    ESP_LOGI(TAG, "Starting Mesh OTA Distribution...");
-    const esp_partition_t *update_partition = esp_ota_get_next_update_partition(NULL);
-    //Or we send the partition we are currently running on.
-    //const esp_partition_t *update_partition = esp_ota_get_running_partition();
+void broadcast_ota_to_mesh(void *arg) {
+    char debug_msg[128];
+
+    // 1. Notify MQTT we are starting
+    snprintf(debug_msg, sizeof(debug_msg), "LOG: Starting OTA Broadcast Task...");
+    esp_mqtt_client_publish(mqtt_client, "mesh/debug", debug_msg, 0, 0, 0);
+
+    // 2. Get Routing Table
+    int route_table_size = esp_mesh_get_routing_table_size();
     
+    // DEBUG: Tell us how many nodes are found
+    snprintf(debug_msg, sizeof(debug_msg), "LOG: Routing Table Size: %d", route_table_size);
+    esp_mqtt_client_publish(mqtt_client, "mesh/debug", debug_msg, 0, 0, 0);
+
+    if (route_table_size < 1) {
+        esp_mqtt_client_publish(mqtt_client, "mesh/debug", "ERROR: No children found! Aborting.", 0, 0, 0);
+        vTaskDelete(NULL);
+        return;
+    }
+
+    mesh_addr_t *route_table = (mesh_addr_t *)malloc(route_table_size * sizeof(mesh_addr_t));
+    ESP_ERROR_CHECK(esp_mesh_get_routing_table(route_table, route_table_size * sizeof(mesh_addr_t), &route_table_size));
+
+    // 3. Prepare Payload
+    const esp_partition_t *update_partition = esp_ota_get_running_partition();
+    if (!update_partition) {
+         esp_mqtt_client_publish(mqtt_client, "mesh/debug", "ERROR: Could not find partition!", 0, 0, 0);
+         vTaskDelete(NULL);
+         return;
+    }
+
     mesh_ota_packet_t packet;
-    packet.type = 1; //OTA START
-    packet.total_size = update_partition->size; // Size of the partition/file
+    packet.type = 1; // OTA START
+    packet.total_size = update_partition->size;
     packet.offset = 0;
-    
-    //1. Send Start Command
+
     mesh_data_t mesh_data = {
         .data = (uint8_t *)&packet,
         .size = sizeof(packet),
@@ -251,42 +294,71 @@ void broadcast_ota_to_mesh() {
         .tos = MESH_TOS_P2P,
     };
 
-    // Use esp_mesh_send with NULL address for BROADCAST --- Send to all children.
-    esp_mesh_send(NULL, &mesh_data, MESH_DATA_P2P | MESH_DATA_TODS, NULL, 0);
-    vTaskDelay(pdMS_TO_TICKS(1000));   //Delay for children to delete partitions.
+    // 4. Send START Command
+    esp_mqtt_client_publish(mqtt_client, "mesh/debug", "LOG: Sending Start Packet...", 0, 0, 0);
+    
+    for (int i = 0; i < route_table_size; i++) {
+        esp_mesh_send(&route_table[i], &mesh_data, MESH_DATA_P2P, NULL, 0);
+    }
+    vTaskDelay(pdMS_TO_TICKS(2000)); 
 
-    // 2. Loop through firmware and send chunks.
+    // 5. Send CHUNKS
     uint32_t offset = 0;
-    packet.type = 2; //OTA CHUNK
+    packet.type = 2; // OTA CHUNK
+    
+    // Notify MQTT we are entering the loop
+    esp_mqtt_client_publish(mqtt_client, "mesh/debug", "LOG: Sending Data Chunks...", 0, 0, 0);
 
     while (offset < update_partition->size) {
-        // Read flash
         esp_partition_read(update_partition, offset, packet.data, OTA_CHUNK_SIZE);
         packet.offset = offset;
-        packet.data_len = OTA_CHUNK_SIZE; // Handle last chunk size logic
+        packet.data_len = OTA_CHUNK_SIZE;
+        mesh_data.size = sizeof(mesh_ota_packet_t);
 
-        mesh_data.size = sizeof(mesh_ota_packet_t);     // Update size
-        
-        //Send to mesh
-        esp_err_t err = esp_mesh_send(NULL, &mesh_data, MESH_DATA_P2P | MESH_DATA_TODS, NULL, 0);
-
-        if (err != ESP_OK) {
-            //MESH can get congested.
-            vTaskDelay(pdMS_TO_TICKS(100));
-        } else {
-            offset += OTA_CHUNK_SIZE;
+        for (int i = 0; i < route_table_size; i++) {
+            esp_mesh_send(&route_table[i], &mesh_data, MESH_DATA_P2P, NULL, 0);
         }
-
-        // An attempt to prevent mesh flooding
-        vTaskDelay(pdMS_TO_TICKS(50));
+        
+        offset += OTA_CHUNK_SIZE;
+        vTaskDelay(pdMS_TO_TICKS(50)); 
     }
 
-    //3. Send End Command
-    packet.type = 3; //OTA END
+    // 6. Send END Command
+    packet.type = 3; // OTA END
     mesh_data.size = sizeof(packet);
-    esp_mesh_send(NULL, &mesh_data, MESH_DATA_P2P | MESH_DATA_TODS, NULL, 0);
+    for (int i = 0; i < route_table_size; i++) {
+        esp_mesh_send(&route_table[i], &mesh_data, MESH_DATA_P2P, NULL, 0);
+    }
 
-    ESP_LOGI(TAG, "OTA Distribution Complete!");
+    esp_mqtt_client_publish(mqtt_client, "mesh/debug", "SUCCESS: Broadcast Complete!", 0, 0, 0);
+    
+    free(route_table);
+    vTaskDelete(NULL);
+}
+
+void ota_task(void *pvParameter) {
+    char *url = (char *)pvParameter;
+    ESP_LOGI(TAG, "Starting OTA Download from: %s", url);
+
+    esp_http_client_config_t config = {
+        .url = url,
+        .cert_pem = NULL, // No SSL for local testing
+        .timeout_ms = 5000,
+        .keep_alive_enable = true,
+    };
+
+    esp_https_ota_config_t ota_config = {
+        .http_config = &config,
+    };
+
+    esp_err_t ret = esp_https_ota(&ota_config);
+    if (ret == ESP_OK) {
+        ESP_LOGI(TAG, "OTA Update Successful! Rebooting...");
+        esp_restart();
+    } else {
+        ESP_LOGE(TAG, "OTA Update Failed! Error: %d", ret);
+    }
+    vTaskDelete(NULL);
 }
 
 void app_main(void) {
@@ -339,6 +411,10 @@ void app_main(void) {
     
     ESP_ERROR_CHECK(esp_mesh_start());
     ESP_LOGI(TAG, "Mesh started successfully, waiting for root...");
+
+    //OTA Test (Uncomment and build new firmware to send to root for OTA.)
+    ESP_LOGI(TAG, "DEVICE ID: %s (v2.0 OTA SUCCESS)", device_id);
+    //ESP_LOGI(TAG, "DEVICE ID: %s (v1.0)", device_id);
 
     xTaskCreate(data_task, "data_task", 3072, NULL, 5, NULL);
 }
