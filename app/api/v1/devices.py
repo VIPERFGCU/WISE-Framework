@@ -135,10 +135,19 @@ async def register_device(payload: DeviceCreate) -> DeviceOut:
 )
 async def list_devices() -> List[DeviceOut]:
     _ensure_mqtt_started()  # make sure cache is live
-    
+
     out: List[DeviceOut] = []
-    for rec in svc.all_devices():
-        out.append(_deviceout_from_cache(rec.device_id, rec))
+    registry = {rec.device_id: rec for rec in svc.all_devices()}
+
+    # Include all known device ids from both registry and live MQTT cache.
+    # This prevents cache-only devices (recently connected but not yet registered)
+    # from disappearing in the UI table.
+    with _cache_lock:
+        cache_ids = set(_mqtt_status_cache.keys())
+
+    for device_id in sorted(set(registry.keys()).union(cache_ids)):
+        rec = registry.get(device_id)
+        out.append(_deviceout_from_cache(device_id, rec))
     out.sort(key=lambda d: d.device_id)
     return out
 

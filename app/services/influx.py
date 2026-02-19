@@ -121,7 +121,7 @@ async def read_accel_series(
     flux = f"""
 from(bucket: "{settings.influx_bucket}")
   |> range(start: -{range})
-  |> filter(fn: (r) => r._measurement == "accel")
+    |> filter(fn: (r) => r._measurement == "accel" or r._measurement == "sensor_data")
   |> filter(fn: (r) => r.device_id == "{device_id}")
   |> pivot(rowKey:["_time"], columnKey: ["_field"], valueColumn: "_value")
   |> keep(columns: ["_time","x","y","z"])

@@ -165,6 +165,8 @@ export default function Streams() {
 
   useEffect(() => {
     loadDevices();
+    const id = setInterval(loadDevices, 10_000);
+    return () => clearInterval(id);
   }, []);
 
   useEffect(() => {
