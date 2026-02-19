@@ -121,7 +121,7 @@ async def read_accel_series(
     flux = f"""
 from(bucket: "{settings.influx_bucket}")
   |> range(start: -{range})
-    |> filter(fn: (r) => r._measurement == "accel" or r._measurement == "sensor_data")
+        |> filter(fn: (r) => r._measurement == "accel" or r._measurement == "accelerometer" or r._measurement == "sensor_data")
   |> filter(fn: (r) => r.device_id == "{device_id}")
   |> pivot(rowKey:["_time"], columnKey: ["_field"], valueColumn: "_value")
   |> keep(columns: ["_time","x","y","z"])
@@ -145,6 +145,68 @@ from(bucket: "{settings.influx_bucket}")
         log.debug(f"Accel query error: {e}")
 
     return AccelSeries(device_id=device_id, series=points)
+
+
+async def read_recent_device_ids(
+        range: str = "24h",
+        query_api: Optional[QueryApi] = None,
+) -> List[str]:
+    """Discover device IDs observed recently in Influx across known measurements.
+
+    Returns an empty list if InfluxDB is unavailable.
+    """
+    if query_api is None:
+        try:
+            import asyncio
+            def create_client():
+                try:
+                    c = InfluxDBClient(
+                        url=settings.influx_url,
+                        token=settings.influx_token,
+                        org=settings.influx_org,
+                        timeout=1_000
+                    )
+                    return c.query_api()
+                except Exception:
+                    return None
+
+            query_api = await asyncio.wait_for(
+                asyncio.get_running_loop().run_in_executor(None, create_client),
+                timeout=1.5
+            )
+            if query_api is None:
+                return []
+        except Exception:
+            return []
+
+    flux = f"""
+from(bucket: "{settings.influx_bucket}")
+  |> range(start: -{range})
+  |> filter(fn: (r) =>
+    r._measurement == "accel" or
+    r._measurement == "accelerometer" or
+    r._measurement == "sensor_data" or
+    r._measurement == "heartbeat"
+  )
+  |> keep(columns: ["device_id"])
+  |> group()
+  |> distinct(column: "device_id")
+  |> sort(columns: ["_value"])
+"""
+
+    out: set[str] = set()
+    try:
+        tables = query_api.query(org=settings.influx_org, query=flux)
+        for table in tables:
+            for record in table.records:
+                v = record.values
+                device_id = v.get("_value") or v.get("device_id")
+                if device_id is not None and str(device_id).strip():
+                    out.add(str(device_id).strip())
+    except Exception as e:
+        log.debug(f"Recent device ids query error: {e}")
+
+    return sorted(out)
 
 async def read_heartbeat_series(
         device_id: str, 

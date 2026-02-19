@@ -8,6 +8,7 @@ from datetime import datetime
 from app import deps
 from app.schemas.device import DeviceCreate, DeviceOut, DeviceOutAdmin
 from app.services import devices as svc
+from app.services.influx import read_recent_device_ids
 
 router = APIRouter(prefix="/api/v1/devices", tags=["devices"])
 
@@ -145,7 +146,9 @@ async def list_devices() -> List[DeviceOut]:
     with _cache_lock:
         cache_ids = set(_mqtt_status_cache.keys())
 
-    for device_id in sorted(set(registry.keys()).union(cache_ids)):
+    influx_ids = set(await read_recent_device_ids(range="24h"))
+
+    for device_id in sorted(set(registry.keys()).union(cache_ids).union(influx_ids)):
         rec = registry.get(device_id)
         out.append(_deviceout_from_cache(device_id, rec))
     out.sort(key=lambda d: d.device_id)
