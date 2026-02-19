@@ -3,7 +3,7 @@ from typing import Set
 from datetime import datetime, timezone
 from queue import Queue, Empty
 
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect, Body
+from fastapi import FastAPI, WebSocket, WebSocketDisconnect, Body, Request, Query
 from fastapi.middleware.cors import CORSMiddleware
 from starlette.responses import Response
 
@@ -64,6 +64,19 @@ app.add_middleware(
 async def cors_preflight_ok(rest_of_path: str) -> Response:
     # CORSMiddleware will add Access-Control-Allow-* headers
     return Response(status_code=200)
+
+
+@app.get("/api/v1/debug/cors")
+async def debug_cors(request: Request, origin: str | None = Query(default=None)):
+    requested_origin = origin or request.headers.get("origin")
+    wildcard = "*" in origins
+    is_allowed = bool(wildcard or (requested_origin and requested_origin in origins))
+    return {
+        "requested_origin": requested_origin,
+        "allowed": is_allowed,
+        "wildcard": wildcard,
+        "configured_origins": origins,
+    }
 
 # -------------------------------------------------------------------
 # Routers
