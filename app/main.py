@@ -290,6 +290,8 @@ async def _drain_mqtt_queue():
                     from app.services.influx import write_accel_point_sync
                     await asyncio.to_thread(write_accel_point_sync, reading, ts)
                     log.info(f"[Influx] Write Success: {reading.device_id} at {ts}")
+                    # Keep device registry fresh so /api/v1/devices shows all active sensors
+                    devices_svc.touch_last_seen(reading.device_id, ts)
                     # Broadcast to websocket clients
                     try:
                         msg = {
@@ -326,6 +328,8 @@ async def _drain_mqtt_queue():
                         ts
                     )
                     log.info(f"[Influx] Heartbeat Write Success: {device_id} (rssi={hb.rssi})")
+                    # Refresh registry presence and recency for standard protocol devices
+                    devices_svc.touch_last_seen(hb.device_id or device_id, ts)
                     # Broadcast heartbeat to websocket clients
                     try:
                         msg = {

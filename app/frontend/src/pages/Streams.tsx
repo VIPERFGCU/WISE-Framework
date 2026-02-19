@@ -60,7 +60,7 @@ function MultiSparkline({ series }: { series: { data: number[]; color: string; l
 }
 
 export default function Streams() {
-  const [device, setDevice] = useState<string>("bridge-esp32-001");
+  const [device, setDevice] = useState<string>("");
   const [windowS, setWindowS] = useState<number>(60);
   const [points, setPoints] = useState<Point[]>([]);
   const [heartbeatPoints, setHeartbeatPoints] = useState<HeartbeatPoint[]>([]);
@@ -72,10 +72,18 @@ export default function Streams() {
   const [liveHeartbeat, setLiveHeartbeat] = useState<HeartbeatPoint | null>(null);
   const wsRef = useRef<WebSocket | null>(null);
 
+  function buildStreamWsUrl(): string {
+    const apiBase = import.meta.env.VITE_API_BASE_URL as string | undefined;
+    const base = apiBase && apiBase !== "/" ? apiBase : window.location.origin;
+    const apiUrl = new URL(base, window.location.origin);
+    const wsUrl = new URL("/api/v1/stream", apiUrl);
+    wsUrl.protocol = apiUrl.protocol === "https:" ? "wss:" : "ws:";
+    return wsUrl.toString();
+  }
+
   useEffect(() => {
     try {
-      const scheme = window.location.protocol === "https:" ? "wss" : "ws";
-      const ws = new WebSocket(`${scheme}://${window.location.host}/api/v1/stream`);
+      const ws = new WebSocket(buildStreamWsUrl());
       wsRef.current = ws;
       ws.onopen = () => console.info("WS open");
       ws.onclose = () => console.info("WS closed");
@@ -144,7 +152,11 @@ export default function Streams() {
     try {
       const res = await api.get("/api/v1/devices");
       if (Array.isArray(res.data)) {
-        setDevices(res.data.map((d: any) => ({ device_id: d.device_id, label: d.label })));
+        const items = res.data.map((d: any) => ({ device_id: d.device_id, label: d.label }));
+        setDevices(items);
+        if (items.length > 0) {
+          setDevice((prev) => (prev && items.some((d) => d.device_id === prev) ? prev : items[0].device_id));
+        }
       }
     } catch (e) {
       setDevices([]);
@@ -156,6 +168,7 @@ export default function Streams() {
   }, []);
 
   useEffect(() => {
+    if (!device) return;
     setPoints([]);
     setHeartbeatPoints([]);
     load(false);
