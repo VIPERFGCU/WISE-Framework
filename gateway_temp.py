@@ -3,7 +3,7 @@ import json
 import time
 from datetime import datetime, timezone
 from influxdb_client import InfluxDBClient, Point, WritePrecision
-from influxdb_client.client.write_api import SYNCHRONOUS
+from influxdb_client.client.write_api import ASYNCHRONOUS
 
 # --- INFLUXDB CONFIG ---
 INFLUX_URL = "wise-net.io:8086"
@@ -13,7 +13,7 @@ INFLUX_BUCKET = "sensors"
 
 # Initialize Influx Client
 influx_client = InfluxDBClient(url=INFLUX_URL, token=INFLUX_TOKEN, org=INFLUX_ORG)
-write_api = influx_client.write_api(write_options=SYNCHRONOUS)
+write_api = influx_client.write_api(write_options=ASYNCHRONOUS)
 
 # --- CONFIG ---
 CLOUD_BROKER_HOST = "wise-net.io" 
@@ -54,7 +54,7 @@ def on_local_message(client, userdata, msg):
             vals = raw.get("vals", [])
 
             base_ts_us = int(raw.get("t_start", 0)) * 1000 
-            interval_us = int(raw.get("interval", 0)) * 1000
+            interval_us = int(raw.get("interval", 0)) * 1_000_000
 
             points_buffer = []
 

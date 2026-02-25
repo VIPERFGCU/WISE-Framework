@@ -83,10 +83,10 @@ void init_time_task() {
 
     portENTER_CRITICAL(&timerMux);
     currentTime = now;  // We update the time after the pps flag indicates that the next second has begun
-//    uint32_t ppsMicros = micros();
-//    currentTime += int((ppsMicros - lastPpsMicros) / 1000);  // Floor divide by the last updated time to account for time passed since pps was updated         
-//    lastPpsMicros = ppsMicros;
-//    ppsFlag = false;
+    uint32_t ppsMicros = micros();
+    currentTime += int((ppsMicros - lastPpsMicros) / 1000);  // Floor divide by the last updated time to account for time passed since pps was updated         
+    lastPpsMicros = ppsMicros;
+    ppsFlag = false;
     portEXIT_CRITICAL(&timerMux);
 
     Serial.printf("Time set to %ld at micros %u\n", currentTime, lastPpsMicros);

@@ -11,12 +11,12 @@
 const char* ssid = "pop-os";
 const char* password = "adminnnn";
 // ======================================================================
-const int MS_INTERVAL = 500; // 500ms per record
+const int MS_INTERVAL = 10; // 10ms per record
 
 hw_timer_t * timer = NULL;
 
 // Handle for the task running on Core 0
-TaskHandle_t mqttTaskHandle;
+TaskHandle_t dataRecorderTask;
 
 float raw_data[3];
 bool isr_timer_fired = false;
@@ -36,16 +36,8 @@ void IRAM_ATTR onTimer() {
 
 // Dedicated Task for MQTT (Core 0)
 void mqttTask(void * parameter) {
-  setup_mqtt();
-
   bool timer_fired = false;
   while(true) {
-    // Maintain MQTT connection
-    if (!client.connected()) {
-      reconnect();
-    }
-    client.loop();
-
     // Process queue
     portENTER_CRITICAL(&accel_timerMux);
     timer_fired = isr_timer_fired;
@@ -77,20 +69,21 @@ void setup(){
 
   ntp_setup();
   init_accelerometer();
+  setup_mqtt();
 
-  // Create the MQTT task on Core 0
+  // Create the data recording task on Core 0
   xTaskCreatePinnedToCore(
     mqttTask,       // Function to implement the task
     "MQTT_Task",    // Name of the task
     10000,          // Stack size in words (increased for JSON ops)
     NULL,           // Task input parameter
     1,              // Priority of the task
-    &mqttTaskHandle,// Task handle
+    &dataRecorderTask,// Task handle
     0);             // Core where the task should run (0)
 
   timer = timerBegin(1000000);  // 1Mhz
   timerAttachInterrupt(timer, &onTimer);
-  timerAlarm(timer, MS_INTERVAL, true, 0);
+  timerAlarm(timer, MS_INTERVAL * 1000, true, 0);
   timerStart(timer);
 
   Serial.println("Setup Complete");

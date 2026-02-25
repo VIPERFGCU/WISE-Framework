@@ -1,0 +1,22 @@
+1771257615: mosquitto version 2.0.22 starting
+1771257615: Config loaded from /mosquitto/config/mosquitto.conf.
+1771257615: Opening ipv4 listen socket on port 1883.
+1771257615: Opening ipv6 listen socket on port 1883.
+1771257615: mosquitto version 2.0.22 running
+1771257688: mosquitto version 2.0.22 terminating
+1771257688: Saving in-memory database to /mosquitto/data//mosquitto.db.
+1771257692: mosquitto version 2.0.22 starting
+1771257692: Config loaded from /mosquitto/config/mosquitto.conf.
+1771257692: Opening ipv4 listen socket on port 1883.
+1771257692: Opening ipv6 listen socket on port 1883.
+1771257692: mosquitto version 2.0.22 running
+1771257695: New connection from 172.18.0.1:60036 on port 1883.
+1771257695: New client connected from 172.18.0.1:60036 as ESP32Client-A4:CF:12:0B:EA:58 (p2, c1, k15).
+1771257729: New connection from 172.18.0.1:55962 on port 1883.
+1771257729: New client connected from 172.18.0.1:55962 as Pi_Gateway_Local (p2, c1, k60).
+1771257750: Client Pi_Gateway_Local closed its connection.
+1771257764: New connection from 172.18.0.1:58648 on port 1883.
+1771257764: New client connected from 172.18.0.1:58648 as Pi_Gateway_Local (p2, c1, k60).
+1771257784: Client Pi_Gateway_Local closed its connection.
+1771257785: mosquitto version 2.0.22 terminating
+1771257785: Saving in-memory database to /mosquitto/data//mosquitto.db.
