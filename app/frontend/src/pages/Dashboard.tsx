@@ -18,17 +18,6 @@ type Snapshot = {
 	messagesPerMin: number;
 };
 
-type SwflSiteKey = "fort_myers" | "cape_coral" | "naples" | "bonita_springs" | "lehigh_acres" | "punta_gorda";
-
-const SWFL_SITE_ANCHORS: Record<SwflSiteKey, { x: number; y: number; label: string }> = {
-	fort_myers: { x: 54, y: 34, label: "Fort Myers" },
-	cape_coral: { x: 49, y: 31, label: "Cape Coral" },
-	naples: { x: 43, y: 60, label: "Naples" },
-	bonita_springs: { x: 48, y: 49, label: "Bonita Springs" },
-	lehigh_acres: { x: 61, y: 41, label: "Lehigh Acres" },
-	punta_gorda: { x: 60, y: 22, label: "Punta Gorda" },
-};
-
 function isStale(d: Device) {
 	const t = parseIsoMs(d.updated_at);
 	if (!Number.isFinite(t)) return false;
@@ -106,15 +95,6 @@ function AreaOperationsChart({ data }: { data: Snapshot[] }) {
 			</svg>
 		</div>
 	);
-}
-
-function hashToSwflSite(sensorId: string): SwflSiteKey {
-	let hash = 0;
-	for (let index = 0; index < sensorId.length; index++) {
-		hash = (hash * 31 + sensorId.charCodeAt(index)) >>> 0;
-	}
-	const sites: SwflSiteKey[] = ["fort_myers", "cape_coral", "naples", "bonita_springs", "lehigh_acres", "punta_gorda"];
-	return sites[hash % sites.length];
 }
 
 function DeltaChip({ delta }: { delta: number }) {
@@ -286,12 +266,6 @@ export default function Dashboard() {
 	const messagesSeries = history.map((h) => h.messagesPerMin);
 	const operationsSeries = history.slice(-20);
 
-	const siteCounts = devices.reduce<Record<SwflSiteKey, number>>((acc, d) => {
-		const site = hashToSwflSite(d.sensor_id);
-		acc[site] = (acc[site] ?? 0) + 1;
-		return acc;
-	}, { fort_myers: 0, cape_coral: 0, naples: 0, bonita_springs: 0, lehigh_acres: 0, punta_gorda: 0 });
-
 	const topSensors = devices
 		.slice()
 		.sort((a, b) => (b.sample_hz ?? 0) - (a.sample_hz ?? 0))
@@ -390,38 +364,15 @@ export default function Dashboard() {
 						<div className="text-xs uppercase tracking-wide text-slate-400">Sensor Locations</div>
 						<div className="text-xs text-slate-400">{total} sensors mapped</div>
 					</div>
-					<div className="relative h-[280px] rounded border border-slate-700 bg-slate-950/70 overflow-hidden">
-						<div className="absolute inset-0 opacity-70">
-							<svg viewBox="0 0 100 100" width="100%" height="100%" preserveAspectRatio="none">
-								<rect x="0" y="0" width="100" height="100" fill="rgba(2,6,23,0.85)" />
-								<path d="M38,12 C42,15 45,20 45,25 C45,30 43,35 45,42 C47,50 53,56 56,64 C59,72 58,81 53,90 C49,97 45,98 40,94 C35,90 35,83 36,77 C37,69 35,63 31,57 C26,49 24,41 25,34 C26,25 30,16 38,12 Z" fill="rgba(30,41,59,0.92)" stroke="rgba(148,163,184,0.28)" strokeWidth="0.6" />
-								<path d="M27,36 C23,40 20,46 21,51 C22,58 28,61 34,62" fill="none" stroke="rgba(125,211,252,0.35)" strokeWidth="0.8" strokeDasharray="1.2 1.2" />
-								<path d="M44,26 C49,31 54,31 59,28" fill="none" stroke="rgba(125,211,252,0.35)" strokeWidth="0.8" strokeDasharray="1.2 1.2" />
-								<text x="10" y="20" fill="rgba(148,163,184,0.5)" fontSize="3.4">Gulf of Mexico</text>
-								<text x="64" y="28" fill="rgba(148,163,184,0.55)" fontSize="3.4">SW Florida</text>
-							</svg>
-						</div>
-						{(Object.keys(SWFL_SITE_ANCHORS) as SwflSiteKey[]).map((site) => {
-							const anchor = SWFL_SITE_ANCHORS[site];
-							const count = siteCounts[site] ?? 0;
-							const size = count > 0 ? 18 + Math.min(24, count * 2) : 14;
-							return (
-								<div
-									key={site}
-									className="absolute -translate-x-1/2 -translate-y-1/2"
-									style={{ left: `${anchor.x}%`, top: `${anchor.y}%` }}
-									title={`${anchor.label}: ${count}`}
-								>
-									<div
-										className="rounded-full bg-sky-500/80 border border-sky-300/80 text-[11px] text-white font-semibold flex items-center justify-center shadow-[0_0_0_4px_rgba(56,189,248,0.15)]"
-										style={{ width: `${size}px`, height: `${size}px` }}
-									>
-										{count}
-									</div>
-									<div className="mt-1 text-[10px] text-slate-300 text-center whitespace-nowrap">{anchor.label}</div>
-								</div>
-							);
-						})}
+					<div className="relative h-[320px] rounded border border-slate-700 bg-slate-950/70 overflow-hidden">
+						<iframe
+							title="Southwest Florida Map"
+							className="h-full w-full"
+							src="https://www.openstreetmap.org/export/embed.html?bbox=-82.45%2C25.55%2C-80.55%2C27.35&amp;layer=mapnik"
+						/>
+					</div>
+					<div className="mt-2 text-xs text-slate-400">
+						GPS markers for individual sensors are planned and intentionally hidden for now.
 					</div>
 				</div>
 
