@@ -18,15 +18,15 @@ type Snapshot = {
 	messagesPerMin: number;
 };
 
-type RegionKey = "NA" | "SA" | "EU" | "AF" | "AS" | "OC";
+type SwflSiteKey = "fort_myers" | "cape_coral" | "naples" | "bonita_springs" | "lehigh_acres" | "punta_gorda";
 
-const REGION_ANCHORS: Record<RegionKey, { x: number; y: number; label: string }> = {
-	NA: { x: 18, y: 35, label: "North America" },
-	SA: { x: 30, y: 67, label: "South America" },
-	EU: { x: 51, y: 30, label: "Europe" },
-	AF: { x: 53, y: 58, label: "Africa" },
-	AS: { x: 74, y: 43, label: "Asia" },
-	OC: { x: 86, y: 73, label: "Oceania" },
+const SWFL_SITE_ANCHORS: Record<SwflSiteKey, { x: number; y: number; label: string }> = {
+	fort_myers: { x: 54, y: 34, label: "Fort Myers" },
+	cape_coral: { x: 49, y: 31, label: "Cape Coral" },
+	naples: { x: 43, y: 60, label: "Naples" },
+	bonita_springs: { x: 48, y: 49, label: "Bonita Springs" },
+	lehigh_acres: { x: 61, y: 41, label: "Lehigh Acres" },
+	punta_gorda: { x: 60, y: 22, label: "Punta Gorda" },
 };
 
 function isStale(d: Device) {
@@ -108,13 +108,13 @@ function AreaOperationsChart({ data }: { data: Snapshot[] }) {
 	);
 }
 
-function hashToRegion(sensorId: string): RegionKey {
+function hashToSwflSite(sensorId: string): SwflSiteKey {
 	let hash = 0;
 	for (let index = 0; index < sensorId.length; index++) {
 		hash = (hash * 31 + sensorId.charCodeAt(index)) >>> 0;
 	}
-	const regions: RegionKey[] = ["NA", "SA", "EU", "AF", "AS", "OC"];
-	return regions[hash % regions.length];
+	const sites: SwflSiteKey[] = ["fort_myers", "cape_coral", "naples", "bonita_springs", "lehigh_acres", "punta_gorda"];
+	return sites[hash % sites.length];
 }
 
 function DeltaChip({ delta }: { delta: number }) {
@@ -286,11 +286,11 @@ export default function Dashboard() {
 	const messagesSeries = history.map((h) => h.messagesPerMin);
 	const operationsSeries = history.slice(-20);
 
-	const regionCounts = devices.reduce<Record<RegionKey, number>>((acc, d) => {
-		const region = hashToRegion(d.sensor_id);
-		acc[region] = (acc[region] ?? 0) + 1;
+	const siteCounts = devices.reduce<Record<SwflSiteKey, number>>((acc, d) => {
+		const site = hashToSwflSite(d.sensor_id);
+		acc[site] = (acc[site] ?? 0) + 1;
 		return acc;
-	}, { NA: 0, SA: 0, EU: 0, AF: 0, AS: 0, OC: 0 });
+	}, { fort_myers: 0, cape_coral: 0, naples: 0, bonita_springs: 0, lehigh_acres: 0, punta_gorda: 0 });
 
 	const topSensors = devices
 		.slice()
@@ -387,37 +387,38 @@ export default function Dashboard() {
 			<div className="grid gap-3 xl:grid-cols-12">
 				<div className="xl:col-span-8 rounded border border-slate-700 bg-slate-900/40 p-4">
 					<div className="mb-3 flex items-center justify-between">
-						<div className="text-xs uppercase tracking-wide text-slate-400">Potential Sensor Locations</div>
+						<div className="text-xs uppercase tracking-wide text-slate-400">Sensor Locations</div>
 						<div className="text-xs text-slate-400">{total} sensors mapped</div>
 					</div>
 					<div className="relative h-[280px] rounded border border-slate-700 bg-slate-950/70 overflow-hidden">
-						<div className="absolute inset-0 opacity-40">
+						<div className="absolute inset-0 opacity-70">
 							<svg viewBox="0 0 100 100" width="100%" height="100%" preserveAspectRatio="none">
-								<path d="M7,40 C18,25 32,22 38,31 C44,39 34,44 30,49 C26,54 24,64 18,66 C11,67 6,59 5,51 C4,45 5,42 7,40 Z" fill="rgba(51,65,85,0.7)" />
-								<path d="M28,67 C34,61 41,62 44,68 C46,72 44,78 41,83 C38,86 33,85 30,80 C26,74 25,70 28,67 Z" fill="rgba(51,65,85,0.7)" />
-								<path d="M45,35 C50,30 57,29 61,33 C65,37 66,44 63,48 C59,52 52,52 47,49 C44,45 43,39 45,35 Z" fill="rgba(51,65,85,0.7)" />
-								<path d="M49,56 C53,53 57,55 60,60 C62,65 61,74 57,80 C54,84 49,83 46,76 C43,69 45,60 49,56 Z" fill="rgba(51,65,85,0.7)" />
-								<path d="M63,36 C70,31 79,34 84,40 C89,46 87,53 80,58 C72,64 66,63 62,57 C59,50 58,41 63,36 Z" fill="rgba(51,65,85,0.7)" />
-								<path d="M82,72 C85,70 89,71 91,74 C93,77 91,82 88,84 C84,86 80,84 79,80 C78,77 79,73 82,72 Z" fill="rgba(51,65,85,0.7)" />
+								<rect x="0" y="0" width="100" height="100" fill="rgba(2,6,23,0.85)" />
+								<path d="M38,12 C42,15 45,20 45,25 C45,30 43,35 45,42 C47,50 53,56 56,64 C59,72 58,81 53,90 C49,97 45,98 40,94 C35,90 35,83 36,77 C37,69 35,63 31,57 C26,49 24,41 25,34 C26,25 30,16 38,12 Z" fill="rgba(30,41,59,0.92)" stroke="rgba(148,163,184,0.28)" strokeWidth="0.6" />
+								<path d="M27,36 C23,40 20,46 21,51 C22,58 28,61 34,62" fill="none" stroke="rgba(125,211,252,0.35)" strokeWidth="0.8" strokeDasharray="1.2 1.2" />
+								<path d="M44,26 C49,31 54,31 59,28" fill="none" stroke="rgba(125,211,252,0.35)" strokeWidth="0.8" strokeDasharray="1.2 1.2" />
+								<text x="10" y="20" fill="rgba(148,163,184,0.5)" fontSize="3.4">Gulf of Mexico</text>
+								<text x="64" y="28" fill="rgba(148,163,184,0.55)" fontSize="3.4">SW Florida</text>
 							</svg>
 						</div>
-						{(Object.keys(REGION_ANCHORS) as RegionKey[]).map((region) => {
-							const anchor = REGION_ANCHORS[region];
-							const count = regionCounts[region] ?? 0;
+						{(Object.keys(SWFL_SITE_ANCHORS) as SwflSiteKey[]).map((site) => {
+							const anchor = SWFL_SITE_ANCHORS[site];
+							const count = siteCounts[site] ?? 0;
 							const size = count > 0 ? 18 + Math.min(24, count * 2) : 14;
 							return (
 								<div
-									key={region}
+									key={site}
 									className="absolute -translate-x-1/2 -translate-y-1/2"
 									style={{ left: `${anchor.x}%`, top: `${anchor.y}%` }}
 									title={`${anchor.label}: ${count}`}
 								>
 									<div
-										className="rounded-full bg-sky-500/70 border border-sky-300/70 text-[11px] text-white font-semibold flex items-center justify-center"
+										className="rounded-full bg-sky-500/80 border border-sky-300/80 text-[11px] text-white font-semibold flex items-center justify-center shadow-[0_0_0_4px_rgba(56,189,248,0.15)]"
 										style={{ width: `${size}px`, height: `${size}px` }}
 									>
 										{count}
 									</div>
+									<div className="mt-1 text-[10px] text-slate-300 text-center whitespace-nowrap">{anchor.label}</div>
 								</div>
 							);
 						})}
