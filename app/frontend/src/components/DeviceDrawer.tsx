@@ -25,22 +25,7 @@ export default function DeviceDrawer({
   if (!device) return null;
   const t = parseIsoMs(device.updated_at);
 
-  const qrPayload = JSON.stringify(
-    {
-      sensor_id: device.sensor_id,
-      label: device.label ?? null,
-      status: device.status,
-      sensing: device.sensing,
-      recording: device.recording,
-      uptime_seconds: device.uptime_seconds,
-      updated_at: device.updated_at ?? null,
-      sample_hz: device.sample_hz ?? null,
-      batch_size: device.batch_size ?? null,
-      generated_at: new Date().toISOString(),
-    },
-    null,
-    2,
-  );
+  const qrPayload = `${window.location.origin}/sensor/${encodeURIComponent(device.sensor_id)}`;
 
   const onPrintQr = () => {
     const svg = qrWrapperRef.current?.querySelector("svg")?.outerHTML;
@@ -72,6 +57,7 @@ export default function DeviceDrawer({
               <div><b>ID:</b> ${escapedId}</div>
               <div><b>Label:</b> ${escapedLabel}</div>
               <div><b>Status:</b> ${escapedStatus}</div>
+              <div><b>URL:</b> ${qrPayload}</div>
             </div>
           </div>
           <script>
@@ -151,7 +137,7 @@ export default function DeviceDrawer({
               <QRCodeSVG value={qrPayload} size={180} includeMargin />
             </div>
             <div className="text-xs text-gray-500 mt-2 break-all">
-              Encoded data: sensor id, label, status, sensing, recording, uptime, last update, sample rate, batch size.
+              Encoded URL: {qrPayload}
             </div>
           </section>
 

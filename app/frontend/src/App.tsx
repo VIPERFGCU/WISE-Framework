@@ -8,10 +8,12 @@ import Status from "./pages/Status";
 import NotFound from "./pages/NotFound";
 import ProtectedRoute from "./auth/ProtectedRoute";
 import Login from "./pages/Login";
+import SensorProfile from "./pages/SensorProfile";
 
 export default function App() {
   return (
     <Routes>
+      <Route path="sensor/:sensorId" element={<SensorProfile />} />
       <Route element={<Shell />}>
         <Route index element={<Dashboard />} />
         <Route path="devices" element={<Devices />} />
