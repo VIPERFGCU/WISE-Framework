@@ -94,6 +94,24 @@ services:
       - influxdb
     restart: unless-stopped
 
+  simulators:
+    build:
+      context: .
+      dockerfile: ./Dockerfile
+    container_name: wisenet-simulators
+    networks:
+      - wisenet-network
+    volumes:
+      - ./:/app
+    depends_on:
+      - mosquitto
+    command: >
+      python scripts/run_simulators.py
+      --broker mosquitto
+      --port 1883
+      --devices bridge-esp32-001,esp32-test-01,sim-device-001
+    restart: unless-stopped
+
 networks:
   wisenet-network:
     driver: bridge 
