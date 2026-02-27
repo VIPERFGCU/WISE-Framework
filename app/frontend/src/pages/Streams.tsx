@@ -4,6 +4,7 @@ import { useRef } from "react";
 
 type Point = { t: string; x: number; y: number; z: number };
 type HeartbeatPoint = { t: string; rssi: number };
+const ALL_SENSORS_VALUE = "__all__";
 
 function Sparkline({ data, color }: { data: number[]; color: string }) {
   const w = 600, h = 120, pad = 6;
@@ -158,7 +159,10 @@ export default function Streams() {
         const items = res.data.map((d: any) => ({ device_id: d.device_id, label: d.label }));
         setDevices(items);
         if (items.length > 0) {
-          setDevice((prev) => (prev && items.some((d) => d.device_id === prev) ? prev : items[0].device_id));
+          setDevice((prev) => {
+            if (prev === ALL_SENSORS_VALUE) return prev;
+            return prev && items.some((d) => d.device_id === prev) ? prev : items[0].device_id;
+          });
         }
       }
     } catch (e) {
@@ -246,6 +250,7 @@ export default function Streams() {
       <div className="flex items-center gap-3">
         <label className="text-sm">Device ID</label>
         <select value={device} onChange={(e) => setDevice(e.target.value)} className="border rounded px-2 py-1">
+          <option value={ALL_SENSORS_VALUE}>All Sensors</option>
           {devices.length === 0 && (
             <option value={device}>{device}</option>
           )}

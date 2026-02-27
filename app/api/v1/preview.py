@@ -6,7 +6,7 @@ import csv
 from io import StringIO
 from datetime import datetime, timezone
 from starlette.responses import Response
-from app.services.influx import read_accel_series, read_heartbeat_series
+from app.services.influx import read_accel_series, read_heartbeat_series, read_recent_device_ids
 from pydantic import BaseModel
 
 log = logging.getLogger("sensor-backend")
@@ -35,12 +35,59 @@ async def preview(device_id: str, window_s: int = Query(60, ge=1, le=3600)):
     else:
         range_str = f"{window_s // 3600}h"
     
+    all_selector = {"__all__", "all", "*"}
+    if device_id in all_selector:
+        device_ids = await read_recent_device_ids(range=range_str)
+        if not device_ids:
+            return {
+                "device_id": "__all__",
+                "accel": None,
+                "heartbeat": None,
+            }
+
+        accel_tasks = [read_accel_series(did, range_str) for did in device_ids]
+        heartbeat_tasks = [read_heartbeat_series(did, range_str) for did in device_ids]
+        accel_results, heartbeat_results = await asyncio.gather(
+            asyncio.gather(*accel_tasks),
+            asyncio.gather(*heartbeat_tasks),
+        )
+
+        accel_points = [
+            {
+                "device_id": series.device_id,
+                "t": point.t,
+                "x": point.x,
+                "y": point.y,
+                "z": point.z,
+            }
+            for series in accel_results
+            for point in series.series
+        ]
+        accel_points.sort(key=lambda p: p["t"])
+
+        heartbeat_points = [
+            {
+                "device_id": series.device_id,
+                "t": point.t,
+                "rssi": point.rssi,
+            }
+            for series in heartbeat_results
+            for point in series.series
+        ]
+        heartbeat_points.sort(key=lambda p: p["t"])
+
+        return {
+            "device_id": "__all__",
+            "accel": {"series": accel_points} if accel_points else None,
+            "heartbeat": {"series": heartbeat_points} if heartbeat_points else None,
+        }
+
     # Query both accel and heartbeat series in parallel
     accel_task = read_accel_series(device_id, range_str)
     heartbeat_task = read_heartbeat_series(device_id, range_str)
-    
+
     accel_series, heartbeat_series = await asyncio.gather(accel_task, heartbeat_task)
-    
+
     return {
         "device_id": device_id,
         "accel": {"series": accel_series.series} if accel_series.series else None,
@@ -93,26 +140,37 @@ async def preview_csv(
     else:
         range_str = f"{range_seconds // 3600}h"
 
-    accel_task = read_accel_series(device_id, range_str)
-    heartbeat_task = read_heartbeat_series(device_id, range_str)
-    accel_series, heartbeat_series = await asyncio.gather(accel_task, heartbeat_task)
+    all_selector = {"__all__", "all", "*"}
+    if device_id in all_selector:
+        device_ids = await read_recent_device_ids(range=range_str)
+    else:
+        device_ids = [device_id]
+
+    accel_tasks = [read_accel_series(did, range_str) for did in device_ids]
+    heartbeat_tasks = [read_heartbeat_series(did, range_str) for did in device_ids]
+    accel_results, heartbeat_results = await asyncio.gather(
+        asyncio.gather(*accel_tasks),
+        asyncio.gather(*heartbeat_tasks),
+    )
 
     output = StringIO()
     writer = csv.writer(output)
-    writer.writerow(["timestamp", "measurement", "x", "y", "z", "rssi"])
+    writer.writerow(["timestamp", "device_id", "measurement", "x", "y", "z", "rssi"])
 
-    for point in accel_series.series:
-        if start_dt and end_dt and not (start_dt <= point.t <= end_dt):
-            continue
-        writer.writerow([point.t.isoformat(), "accel", point.x, point.y, point.z, ""])
+    for series in accel_results:
+        for point in series.series:
+            if start_dt and end_dt and not (start_dt <= point.t <= end_dt):
+                continue
+            writer.writerow([point.t.isoformat(), series.device_id, "accel", point.x, point.y, point.z, ""])
 
-    for point in heartbeat_series.series:
-        if start_dt and end_dt and not (start_dt <= point.t <= end_dt):
-            continue
-        writer.writerow([point.t.isoformat(), "heartbeat", "", "", "", point.rssi])
+    for series in heartbeat_results:
+        for point in series.series:
+            if start_dt and end_dt and not (start_dt <= point.t <= end_dt):
+                continue
+            writer.writerow([point.t.isoformat(), series.device_id, "heartbeat", "", "", "", point.rssi])
 
     ts = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
-    safe_device_id = "".join(c if c.isalnum() or c in ("-", "_") else "_" for c in device_id)
+    safe_device_id = "all_sensors" if device_id in all_selector else "".join(c if c.isalnum() or c in ("-", "_") else "_" for c in device_id)
     filename = f"{safe_device_id}_streams_{ts}.csv"
 
     return Response(
