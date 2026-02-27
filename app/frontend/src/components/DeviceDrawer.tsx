@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef } from "react";
+import { useEffect, useRef } from "react";
 import type { Device } from "../types/device";
 import StatusBadge from "./StatusBadge";
 import BoolPill from "./BoolPill";
@@ -25,24 +25,21 @@ export default function DeviceDrawer({
   if (!device) return null;
   const t = parseIsoMs(device.updated_at);
 
-  const qrPayload = useMemo(
-    () => JSON.stringify(
-      {
-        sensor_id: device.sensor_id,
-        label: device.label ?? null,
-        status: device.status,
-        sensing: device.sensing,
-        recording: device.recording,
-        uptime_seconds: device.uptime_seconds,
-        updated_at: device.updated_at ?? null,
-        sample_hz: device.sample_hz ?? null,
-        batch_size: device.batch_size ?? null,
-        generated_at: new Date().toISOString(),
-      },
-      null,
-      2,
-    ),
-    [device],
+  const qrPayload = JSON.stringify(
+    {
+      sensor_id: device.sensor_id,
+      label: device.label ?? null,
+      status: device.status,
+      sensing: device.sensing,
+      recording: device.recording,
+      uptime_seconds: device.uptime_seconds,
+      updated_at: device.updated_at ?? null,
+      sample_hz: device.sample_hz ?? null,
+      batch_size: device.batch_size ?? null,
+      generated_at: new Date().toISOString(),
+    },
+    null,
+    2,
   );
 
   const onPrintQr = () => {
