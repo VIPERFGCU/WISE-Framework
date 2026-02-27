@@ -1,8 +1,9 @@
-import { useEffect } from "react";
+import { useEffect, useMemo, useRef } from "react";
 import type { Device } from "../types/device";
 import StatusBadge from "./StatusBadge";
 import BoolPill from "./BoolPill";
 import { formatUptime, parseIsoMs, timeAgo } from "../lib/format";
+import { QRCodeSVG } from "qrcode.react";
 
 export default function DeviceDrawer({
   device,
@@ -11,6 +12,8 @@ export default function DeviceDrawer({
   device: Device | null;
   onClose: () => void;
 }) {
+  const qrWrapperRef = useRef<HTMLDivElement | null>(null);
+
   useEffect(() => {
     function onEsc(e: KeyboardEvent) {
       if (e.key === "Escape") onClose();
@@ -21,6 +24,67 @@ export default function DeviceDrawer({
 
   if (!device) return null;
   const t = parseIsoMs(device.updated_at);
+
+  const qrPayload = useMemo(
+    () => JSON.stringify(
+      {
+        sensor_id: device.sensor_id,
+        label: device.label ?? null,
+        status: device.status,
+        sensing: device.sensing,
+        recording: device.recording,
+        uptime_seconds: device.uptime_seconds,
+        updated_at: device.updated_at ?? null,
+        sample_hz: device.sample_hz ?? null,
+        batch_size: device.batch_size ?? null,
+        generated_at: new Date().toISOString(),
+      },
+      null,
+      2,
+    ),
+    [device],
+  );
+
+  const onPrintQr = () => {
+    const svg = qrWrapperRef.current?.querySelector("svg")?.outerHTML;
+    if (!svg) return;
+
+    const win = window.open("", "_blank", "width=600,height=800");
+    if (!win) return;
+
+    const escapedId = device.sensor_id.replace(/</g, "&lt;").replace(/>/g, "&gt;");
+    const escapedLabel = (device.label ?? "-").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+    const escapedStatus = device.status.replace(/</g, "&lt;").replace(/>/g, "&gt;");
+
+    win.document.write(`
+      <html>
+        <head>
+          <title>Sensor QR - ${escapedId}</title>
+          <style>
+            body { font-family: Arial, sans-serif; margin: 24px; }
+            .card { border: 1px solid #ddd; border-radius: 8px; padding: 16px; max-width: 420px; }
+            .meta { margin-top: 12px; line-height: 1.5; font-size: 14px; }
+            .meta b { display: inline-block; width: 90px; }
+          </style>
+        </head>
+        <body>
+          <div class="card">
+            <h2>Sensor QR</h2>
+            ${svg}
+            <div class="meta">
+              <div><b>ID:</b> ${escapedId}</div>
+              <div><b>Label:</b> ${escapedLabel}</div>
+              <div><b>Status:</b> ${escapedStatus}</div>
+            </div>
+          </div>
+          <script>
+            window.onload = function() { window.print(); };
+          </script>
+        </body>
+      </html>
+    `);
+    win.document.close();
+  };
 
   return (
     <div className="fixed inset-0 z-50">
@@ -73,6 +137,24 @@ export default function DeviceDrawer({
               ) : (
                 "—"
               )}
+            </div>
+          </section>
+
+          <section className="border rounded p-3 bg-white">
+            <div className="flex items-center justify-between mb-2">
+              <div className="text-xs text-gray-500">Sensor QR Code</div>
+              <button
+                onClick={onPrintQr}
+                className="text-sm border rounded px-2 py-1 bg-white hover:bg-gray-50"
+              >
+                Print QR
+              </button>
+            </div>
+            <div className="flex items-center justify-center border rounded p-3 bg-gray-50" ref={qrWrapperRef}>
+              <QRCodeSVG value={qrPayload} size={180} includeMargin />
+            </div>
+            <div className="text-xs text-gray-500 mt-2 break-all">
+              Encoded data: sensor id, label, status, sensing, recording, uptime, last update, sample rate, batch size.
             </div>
           </section>
 
