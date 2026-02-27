@@ -66,6 +66,9 @@ export default function Streams() {
   const [heartbeatPoints, setHeartbeatPoints] = useState<HeartbeatPoint[]>([]);
   const [loading, setLoading] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
+  const [downloadingCsv, setDownloadingCsv] = useState(false);
+  const [csvFrom, setCsvFrom] = useState<string>("");
+  const [csvTo, setCsvTo] = useState<string>("");
   const [devices, setDevices] = useState<{ device_id: string; label?: string }[]>([]);
   // Live MQTT stream via backend WebSocket
   const [livePoints, setLivePoints] = useState<Point[]>([]);
@@ -178,9 +181,67 @@ export default function Streams() {
     return () => clearInterval(id);
   }, [device, windowS]);
 
+  const downloadCsv = async () => {
+    if (!device) return;
+    try {
+      setDownloadingCsv(true);
+      const params = new URLSearchParams();
+      if (csvFrom && csvTo) {
+        params.set("start_ts", new Date(csvFrom).toISOString());
+        params.set("end_ts", new Date(csvTo).toISOString());
+      } else {
+        params.set("window_s", String(windowS));
+      }
+
+      const res = await api.get(`/api/preview/${encodeURIComponent(device)}/csv?${params.toString()}`, {
+        responseType: "blob",
+      });
+
+      const contentDisposition = res.headers["content-disposition"] as string | undefined;
+      const filenameMatch = contentDisposition?.match(/filename="?([^";]+)"?/i);
+      const filename = filenameMatch?.[1] || `${device}_streams.csv`;
+
+      const url = window.URL.createObjectURL(res.data);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      window.URL.revokeObjectURL(url);
+    } finally {
+      setDownloadingCsv(false);
+    }
+  };
+
   return (
     <div className="flex flex-col h-full space-y-4 p-4">
-      <h1 className="text-2xl font-bold text-gray-800">Sensor Streams</h1>
+      <div className="flex items-center justify-between gap-3 flex-wrap">
+        <h1 className="text-2xl font-bold text-gray-800">Sensor Streams</h1>
+        <div className="flex items-center gap-2">
+          <label className="text-xs text-gray-600">From</label>
+          <input
+            type="datetime-local"
+            value={csvFrom}
+            onChange={(e) => setCsvFrom(e.target.value)}
+            className="border rounded px-2 py-1 text-sm"
+          />
+          <label className="text-xs text-gray-600">To</label>
+          <input
+            type="datetime-local"
+            value={csvTo}
+            onChange={(e) => setCsvTo(e.target.value)}
+            className="border rounded px-2 py-1 text-sm"
+          />
+          <button
+            onClick={downloadCsv}
+            disabled={!device || downloadingCsv}
+            className="px-3 py-1 rounded bg-blue-600 text-white disabled:opacity-60 disabled:cursor-not-allowed"
+          >
+            {downloadingCsv ? "Downloading CSV…" : "Download CSV"}
+          </button>
+        </div>
+      </div>
 
       <div className="flex items-center gap-3">
         <label className="text-sm">Device ID</label>
