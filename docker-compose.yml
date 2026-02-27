@@ -31,7 +31,7 @@ services:
       context: ./app/frontend
       dockerfile: Dockerfile
       args:
-        - VITE_API_BASE_URL=http://wise-net.io:8000
+        - VITE_API_BASE_URL=/
     container_name: wisenet-frontend
     networks:
       - wisenet-network
@@ -41,7 +41,7 @@ services:
       - api
     restart: unless-stopped
     environment:
-      - VITE_API_BASE_URL=http://wise-net.io:8000
+      - VITE_API_BASE_URL=/
 
   influxdb:
     image: influxdb:2.7
