@@ -37,7 +37,8 @@ def _deviceout_from_cache(device_id: str, rec=None) -> DeviceOut:
     with _cache_lock:
         c = _mqtt_status_cache.get(device_id)
 
-    sensing = (c.get("state") == "streaming") if c else False
+    cached_state = c.get("state") if c else None
+    sensing = cached_state == "streaming"
     label = (rec.label if rec and getattr(rec, "label", None) else device_id)
     last_seen = None
     # Prefer service-observed last_seen when available, else use cache ts
@@ -50,10 +51,10 @@ def _deviceout_from_cache(device_id: str, rec=None) -> DeviceOut:
         device_id=device_id,
         label=label,
         last_seen=last_seen,
-        status=(c.get("state") if c else "unknown"),
+        status=(cached_state or (svc.status(rec) if rec else "unknown")),
         sensing=sensing,
-        sample_hz=(c.get("rate_hz") if c else None),
-        batch_size=(c.get("batch_size") if c else None),
+        sample_hz=(c.get("rate_hz") if c and c.get("rate_hz") is not None else (getattr(rec, "preferred_rate_hz", None) if rec else None)),
+        batch_size=(c.get("batch_size") if c and c.get("batch_size") is not None else (getattr(rec, "preferred_batch_size", None) if rec else None)),
         uptime_seconds=(c.get("uptime_s", 0) if c else 0),
     )
 

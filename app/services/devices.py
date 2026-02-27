@@ -15,6 +15,8 @@ class DeviceRecord:
     notes: Optional[str] = None
     last_seen: Optional[str] = None  # ISO8601 string
     mqtt_key: Optional[str] = None
+    preferred_rate_hz: Optional[int] = None
+    preferred_batch_size: Optional[int] = None
 
 def _load() -> Dict[str, DeviceRecord]:
     if not _REGISTRY_PATH.exists():
@@ -58,6 +60,22 @@ def touch_last_seen(device_id: str, ts: Optional[datetime] = None) -> None:
     rec.last_seen = iso
     state[device_id] = rec
     _save(state)
+
+def set_rate(device_id: str, rate_hz: int) -> DeviceRecord:
+    state = _load()
+    rec = state.get(device_id) or DeviceRecord(device_id=device_id)
+    rec.preferred_rate_hz = int(rate_hz)
+    state[device_id] = rec
+    _save(state)
+    return rec
+
+def set_batch(device_id: str, batch_size: int) -> DeviceRecord:
+    state = _load()
+    rec = state.get(device_id) or DeviceRecord(device_id=device_id)
+    rec.preferred_batch_size = int(batch_size)
+    state[device_id] = rec
+    _save(state)
+    return rec
 
 def status(rec: DeviceRecord, offline_after_seconds: int = 60) -> str:
     if not rec.last_seen:

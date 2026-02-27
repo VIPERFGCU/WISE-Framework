@@ -1,20 +1,29 @@
 {
   "esp32-test-01": {
     "device_id": "esp32-test-01",
-    "label": "Test",
+    "label": "Virtual Sensor 02",
     "notes": "Test",
-    "last_seen": null
+    "last_seen": null,
+    "mqtt_key": null,
+    "preferred_rate_hz": 10,
+    "preferred_batch_size": 1
   },
   "bridge-esp32-001": {
     "device_id": "bridge-esp32-001",
-    "label": "bridge-esp32-001",
+    "label": "Virtual Sensor 01",
     "notes": "registered-by-agent",
-    "last_seen": null
+    "last_seen": null,
+    "mqtt_key": null,
+    "preferred_rate_hz": 10,
+    "preferred_batch_size": 1
   },
   "sim-device-001": {
     "device_id": "sim-device-001",
-    "label": "Simulated Test Device",
+    "label": "Virtual Sensor 03",
     "notes": "Fake device simulator for testing",
-    "last_seen": null
+    "last_seen": null,
+    "mqtt_key": null,
+    "preferred_rate_hz": 10,
+    "preferred_batch_size": 1
   }
 }
