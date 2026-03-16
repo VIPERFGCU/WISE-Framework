@@ -1,0 +1,9 @@
+# Name,   Type, SubType, Offset,  Size, Flags
+nvs,      data, nvs,     ,        0x4000,
+otadata,  data, ota,     ,        0x2000,
+phy_init, data, phy,     ,        0x1000,
+# No Factory Partition - We boot directly to ota_0
+ota_0,    app,  ota_0,   ,        1536K,
+ota_1,    app,  ota_1,   ,        1536K,
+# Remaining space for file system (~800KB)
+spiffs,   data, spiffs,  ,        0xC0000,

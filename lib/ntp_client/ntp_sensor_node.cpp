@@ -3,9 +3,7 @@
 #include "ntp_client.h"
 #include "Accerometer.h"
 #include "mqtt_client.h"
-
-//# define USE_OLD  // the http influxdb handler
-#include "influx_db_handler.h"
+#include "ntp_sensor_node.h"
 
 // ================== WIFI CONFIGURATION ===================
 const char* ssid = "pop-os";
@@ -89,7 +87,3 @@ void setup(){
   Serial.println("Setup Complete");
 }
 
-void loop() {
-  // Empty: work is done in Timer ISR (Core 1) and MQTT Task (Core 0)
-  vTaskDelete(NULL); // Delete the loop task to save resources
-}

@@ -1,5 +1,4 @@
-#pragma once
-
+#include "ntp_client.h"
 #include <WiFi.h>
 #include <WiFiUdp.h>
 #include "time.h"
