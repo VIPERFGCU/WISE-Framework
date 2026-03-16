@@ -58,40 +58,53 @@ void IRAM_ATTR onPPS() {
 
 void init_time_task() {
   while (currentTime == 0) {
-    unsigned long delayMicros = 0;
+    Serial.println("Waiting for PPS pulse to align NTP request...");
+
+    // 1. Clear the flag and wait for a PPS pulse to ensure we are at the very start of a second
+    portENTER_CRITICAL(&timerMux);
+    ppsFlag = false;
+    portEXIT_CRITICAL(&timerMux);
+
+    bool ppsSeen = false; // FIXED: Initialize to false so the loop actually runs
+    while (!ppsSeen) {
+      portENTER_CRITICAL(&timerMux);
+      ppsSeen = ppsFlag;
+      portEXIT_CRITICAL(&timerMux);
+      delay(10); // Poll every 10ms
+    }
+
+    // Capture the exact microsecond timestamp of the pulse we are syncing to
+    portENTER_CRITICAL(&timerMux);
+    uint32_t syncPpsMicros = lastPpsMicros;
+    portEXIT_CRITICAL(&timerMux);
+
+    // 2. Fetch NTP immediately AFTER the pulse. 
+    // We now have almost a full second of buffer time before the next pulse hits.
     time_t now = getNtpTime(ntpServer);
-    
+
     if (now == 0) {
       Serial.println("No NTP response, retrying...");
       delay(1000);
       continue;
     }
+
+    // 3. Verify the NTP request didn't take so long that we crossed into the NEXT second
     portENTER_CRITICAL(&timerMux);
-    lastPpsMicros = micros();
-    ppsFlag = false;
-    portEXIT_CRITICAL(&timerMux);
+    uint32_t elapsedSincePps = micros() - syncPpsMicros;
     
-    Serial.println("Waiting for pps pulse.");
-    // Wait for PPS pulse
-    bool ppsSeen = true;
-    while (!ppsSeen) {
-      portENTER_CRITICAL(&timerMux);
-      ppsSeen = ppsFlag;
+    // If the NTP fetch took less than 900ms, it belongs to the current second
+    if (elapsedSincePps < 900000) { 
+      currentTime = now;
+      microsecondAccumulator = 0; // FIXED: Reset accumulator so onPPS cleanly adds 1 second on the next pulse
+      
+      Serial.printf("Time synced to %ld (NTP latency: %u ms)\n", currentTime, elapsedSincePps / 1000);
       portEXIT_CRITICAL(&timerMux);
-      delay(20);
+      break; // Sync successful, exit the while loop
+    } else {
+      // The network lagged and we got too close to the next second boundary. Retry.
+      portEXIT_CRITICAL(&timerMux);
+      Serial.println("NTP response took too long, retrying to avoid race condition...");
     }
-
-    portENTER_CRITICAL(&timerMux);
-    currentTime = now;  // We update the time after the pps flag indicates that the next second has begun
-//    uint32_t ppsMicros = micros();
-//    currentTime += int((ppsMicros - lastPpsMicros) / 1000);  // Floor divide by the last updated time to account for time passed since pps was updated         
-//    lastPpsMicros = ppsMicros;
-//    ppsFlag = false;
-    portEXIT_CRITICAL(&timerMux);
-
-    Serial.printf("Time set to %ld at micros %u\n", currentTime, lastPpsMicros);
-
-    delay(1000);
   }
   
   Serial.println("init_time_task done, deleting task.");

@@ -3,7 +3,7 @@ import json
 import time
 from datetime import datetime, timezone
 from influxdb_client import InfluxDBClient, Point, WritePrecision
-from influxdb_client.client.write_api import SYNCHRONOUS
+from influxdb_client.client.write_api import ASYNCHRONOUS
 
 # --- INFLUXDB CONFIG ---
 INFLUX_URL = "wise-net.io:8086"
@@ -13,7 +13,7 @@ INFLUX_BUCKET = "sensors"
 
 # Initialize Influx Client
 influx_client = InfluxDBClient(url=INFLUX_URL, token=INFLUX_TOKEN, org=INFLUX_ORG)
-write_api = influx_client.write_api(write_options=SYNCHRONOUS)
+write_api = influx_client.write_api(write_options=ASYNCHRONOUS)
 
 # --- CONFIG ---
 CLOUD_BROKER_HOST = "wise-net.io" 
@@ -36,6 +36,8 @@ local_client = mqtt.Client(mqtt.CallbackAPIVersion.VERSION2, "Pi_Gateway_Local")
 
 device_id_cnt = 0   # A straight counter for every new device
 
+upload_timing = {}
+
 def on_local_message(client, userdata, msg):
     """
     Received packet from Mesh.
@@ -54,7 +56,23 @@ def on_local_message(client, userdata, msg):
             vals = raw.get("vals", [])
 
             base_ts_us = int(raw.get("t_start", 0)) * 1000 
-            interval_us = int(raw.get("interval", 0)) * 1000
+            interval_us = int(raw.get("interval", 0)) * 1_000_000
+
+                        # --- TIMING ADJUSTMENT LOGIC ---
+            if device_id in upload_timing:
+                expected_base_ts = upload_timing[device_id]
+                
+                # Check the difference between reported time and expected time
+                drift = abs(base_ts_us - expected_base_ts)
+                
+                # If the drift is within 3 intervals, it's just network/processing jitter. 
+                # Snap it to the expected timestamp to maintain perfect continuity.
+                if drift < (interval_us * 3):
+                    base_ts_us = expected_base_ts
+                else:
+                    print(f"[WARN] {device_id}: Large time gap/drift detected. Resetting baseline.")
+            
+            # -------------------------------
 
             points_buffer = []
 
@@ -71,8 +89,12 @@ def on_local_message(client, userdata, msg):
                     .time(current_ts, WritePrecision.NS)
                 
                 points_buffer.append(p)
+                                        
+            # Update expected next timestamp for the next batch from this device
+            upload_timing[device_id] = base_ts_us + (len(vals) * interval_us)
+
             # Bulk write to InfluxDB
-            if len(points_buffer) > 1:
+            if len(points_buffer) > 0:
                 write_api.write(bucket=INFLUX_BUCKET, org=INFLUX_ORG, record=points_buffer)
                 print(f"[DATA] Wrote {len(points_buffer)} records for {device_id}")
 
