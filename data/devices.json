@@ -1,29 +1,56 @@
 {
-  "esp32-test-01": {
-    "device_id": "esp32-test-01",
-    "label": "Virtual Sensor 02",
-    "notes": "Test",
-    "last_seen": null,
+  "dev-sensor-001": {
+    "device_id": "dev-sensor-001",
+    "label": "dev-sensor-001",
+    "notes": "Test Node for Development",
+    "last_seen": "2026-03-22T17:23:49.363926+00:00",
+    "mqtt_key": null,
+    "preferred_rate_hz": 10,
+    "preferred_batch_size": 1
+  },
+  "dev-sensor-002": {
+    "device_id": "dev-sensor-002",
+    "label": "dev-sensor-002",
+    "notes": "Test Node for Development",
+    "last_seen": "2026-03-22T17:23:49.368159+00:00",
+    "mqtt_key": null,
+    "preferred_rate_hz": 10,
+    "preferred_batch_size": 1
+  },
+  "dev-sensor-003": {
+    "device_id": "dev-sensor-003",
+    "label": "dev-sensor-003",
+    "notes": "Test Node for Development",
+    "last_seen": "2026-03-22T17:23:49.390660+00:00",
     "mqtt_key": null,
     "preferred_rate_hz": 10,
     "preferred_batch_size": 1
   },
   "bridge-esp32-001": {
     "device_id": "bridge-esp32-001",
-    "label": "Virtual Sensor 01",
-    "notes": "registered-by-agent",
-    "last_seen": null,
+    "label": null,
+    "notes": null,
+    "last_seen": "2026-03-22T17:27:00.198785+00:00",
     "mqtt_key": null,
-    "preferred_rate_hz": 10,
-    "preferred_batch_size": 1
+    "preferred_rate_hz": null,
+    "preferred_batch_size": null
+  },
+  "esp32-test-01": {
+    "device_id": "esp32-test-01",
+    "label": null,
+    "notes": null,
+    "last_seen": "2026-03-22T17:27:00.206999+00:00",
+    "mqtt_key": null,
+    "preferred_rate_hz": null,
+    "preferred_batch_size": null
   },
   "sim-device-001": {
     "device_id": "sim-device-001",
-    "label": "Virtual Sensor 03",
-    "notes": "Fake device simulator for testing",
-    "last_seen": null,
+    "label": null,
+    "notes": null,
+    "last_seen": "2026-03-22T17:27:00.219057+00:00",
     "mqtt_key": null,
-    "preferred_rate_hz": 10,
-    "preferred_batch_size": 1
+    "preferred_rate_hz": null,
+    "preferred_batch_size": null
   }
 }

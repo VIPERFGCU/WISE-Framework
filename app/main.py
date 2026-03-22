@@ -93,7 +93,7 @@ app.include_router(auth.router)
 # Debug / Manual Control
 # -------------------------------------------------------------------
 @app.post("/api/v1/debug/start")
-async def debug_start_sensor(device_id: str = "bridge-esp32-001"):
+async def debug_start_sensor(device_id: str = "dev-sensor-001"):
     """
     Manually triggers the sensor to start via the backend's MQTT logic.
     This effectively tells the ESP32 to set 'streaming = true'.

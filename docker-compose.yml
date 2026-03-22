@@ -109,7 +109,7 @@ services:
       python scripts/run_simulators.py
       --broker mosquitto
       --port 1883
-      --devices bridge-esp32-001,esp32-test-01,sim-device-001
+      --devices dev-sensor-001,dev-sensor-002,dev-sensor-003
     restart: unless-stopped
 
 networks:
