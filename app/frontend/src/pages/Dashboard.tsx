@@ -24,6 +24,13 @@ function isStale(d: Device) {
 	return Date.now() - t > STALE_SEC * 1000;
 }
 
+function pointerIndexFromEvent(event: React.PointerEvent<SVGSVGElement>, length: number): number {
+	const rect = event.currentTarget.getBoundingClientRect();
+	const relX = event.clientX - rect.left;
+	const ratio = Math.max(0, Math.min(1, relX / Math.max(1, rect.width)));
+	return Math.max(0, Math.min(length - 1, Math.round(ratio * (length - 1))));
+}
+
 function MiniSparkline({ data, color }: { data: number[]; color: string }) {
 	const width = 120;
 	const height = 62;
@@ -48,39 +55,35 @@ function MiniSparkline({ data, color }: { data: number[]; color: string }) {
 	const d = data.map((value, index) => `${index === 0 ? "M" : "L"} ${scaleX(index)} ${scaleY(value)}`).join(" ");
 	const cursorX = scaleX(cursor);
 	const cursorY = scaleY(data[cursor] ?? data[data.length - 1]);
+	const scrubY = height - 8;
 
 	return (
-		<div className="space-y-1">
-			<div className="relative">
-				<svg
-					viewBox={`0 0 ${width} ${height}`}
-					width="100%"
-					height={height}
-					onMouseMove={(e) => {
-						const rect = e.currentTarget.getBoundingClientRect();
-						const relX = e.clientX - rect.left;
-						const idx = Math.max(0, Math.min(data.length - 1, Math.round((relX / Math.max(1, rect.width)) * (data.length - 1))));
-						setCursor(idx);
-					}}
-				>
-					<line x1={left} y1={height - bottom} x2={width - right} y2={height - bottom} stroke="rgba(148,163,184,0.6)" strokeWidth="1" />
-					<line x1={left} y1={top} x2={left} y2={height - bottom} stroke="rgba(148,163,184,0.6)" strokeWidth="1" />
-					<path d={d} fill="none" stroke={color} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
-					<line x1={cursorX} y1={top} x2={cursorX} y2={height - bottom} stroke="rgba(148,163,184,0.5)" strokeDasharray="2 2" />
-					<circle cx={cursorX} cy={cursorY} r={2.5} fill={color} />
-				</svg>
-				<div className="pointer-events-none absolute rounded border border-slate-600 bg-slate-900/95 px-1.5 py-1 text-[10px] text-slate-200" style={{ left: `${Math.min(72, Math.max(4, (cursorX / width) * 100))}%`, top: "4px" }}>
-					{(data[cursor] ?? 0).toFixed(1)}
-				</div>
+		<div className="relative">
+			<svg
+				viewBox={`0 0 ${width} ${height}`}
+				width="100%"
+				height={height}
+				style={{ touchAction: "none" }}
+				onPointerDown={(e) => {
+					e.currentTarget.setPointerCapture(e.pointerId);
+					setCursor(pointerIndexFromEvent(e, data.length));
+				}}
+				onPointerMove={(e) => {
+					setCursor(pointerIndexFromEvent(e, data.length));
+				}}
+			>
+				<line x1={left} y1={height - bottom} x2={width - right} y2={height - bottom} stroke="rgba(148,163,184,0.6)" strokeWidth="1" />
+				<line x1={left} y1={top} x2={left} y2={height - bottom} stroke="rgba(148,163,184,0.6)" strokeWidth="1" />
+				<path d={d} fill="none" stroke={color} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
+				<line x1={cursorX} y1={top} x2={cursorX} y2={height - bottom} stroke="rgba(148,163,184,0.5)" strokeDasharray="2 2" />
+				<line x1={left} y1={scrubY} x2={width - right} y2={scrubY} stroke="rgba(148,163,184,0.5)" strokeWidth="1.5" />
+				<line x1={cursorX} y1={height - bottom} x2={cursorX} y2={scrubY} stroke="rgba(148,163,184,0.45)" strokeWidth="1" />
+				<circle cx={cursorX} cy={cursorY} r={2.5} fill={color} />
+				<circle cx={cursorX} cy={scrubY} r={3.8} fill="#ffffff" stroke={color} strokeWidth={1.8} />
+			</svg>
+			<div className="pointer-events-none absolute rounded border border-slate-600 bg-slate-900/95 px-1.5 py-1 text-[10px] text-slate-200" style={{ left: `${Math.min(72, Math.max(4, (cursorX / width) * 100))}%`, top: "4px" }}>
+				{(data[cursor] ?? 0).toFixed(1)}
 			</div>
-			<input
-				type="range"
-				min={0}
-				max={Math.max(0, data.length - 1)}
-				value={cursor}
-				onChange={(e) => setCursor(Number(e.target.value))}
-				className="w-full"
-			/>
 		</div>
 	);
 }
@@ -114,6 +117,7 @@ function AreaOperationsChart({ data }: { data: Snapshot[] }) {
 	const areaD = `${lineD} L ${scaleX(data.length - 1)} ${height - padY} L ${scaleX(0)} ${height - padY} Z`;
 	const cursorX = scaleX(cursor);
 	const cursorY = scaleY(data[cursor].messagesPerMin);
+	const scrubY = height - 10;
 
 	const horizontalGuides = [0.2, 0.4, 0.6, 0.8].map((r) => {
 		const y = padY + r * (height - padY * 2);
@@ -134,11 +138,13 @@ function AreaOperationsChart({ data }: { data: Snapshot[] }) {
 					viewBox={`0 0 ${width} ${height}`}
 					width="100%"
 					height={260}
-					onMouseMove={(e) => {
-						const rect = e.currentTarget.getBoundingClientRect();
-						const relX = e.clientX - rect.left;
-						const idx = Math.max(0, Math.min(data.length - 1, Math.round((relX / Math.max(1, rect.width)) * (data.length - 1))));
-						setCursor(idx);
+					style={{ touchAction: "none" }}
+					onPointerDown={(e) => {
+						e.currentTarget.setPointerCapture(e.pointerId);
+						setCursor(pointerIndexFromEvent(e, data.length));
+					}}
+					onPointerMove={(e) => {
+						setCursor(pointerIndexFromEvent(e, data.length));
 					}}
 				>
 					{horizontalGuides}
@@ -147,7 +153,10 @@ function AreaOperationsChart({ data }: { data: Snapshot[] }) {
 					<path d={areaD} fill="url(#opsArea)" />
 					<path d={lineD} fill="none" stroke="#38bdf8" strokeWidth={3} strokeLinecap="round" strokeLinejoin="round" />
 					<line x1={cursorX} y1={padY} x2={cursorX} y2={height - padY} stroke="rgba(148,163,184,0.5)" strokeDasharray="4 3" />
+					<line x1={padX} y1={scrubY} x2={width - padX} y2={scrubY} stroke="rgba(148,163,184,0.5)" strokeWidth="1.5" />
+					<line x1={cursorX} y1={height - padY} x2={cursorX} y2={scrubY} stroke="rgba(148,163,184,0.45)" strokeWidth="1" />
 					<circle cx={cursorX} cy={cursorY} r={4} fill="#38bdf8" />
+					<circle cx={cursorX} cy={scrubY} r={5} fill="#ffffff" stroke="#38bdf8" strokeWidth={2} />
 					<text x={(padX + width - padX) / 2} y={height - 6} textAnchor="middle" fontSize="12" fill="#94a3b8">Sample</text>
 					<text x={12} y={height / 2} textAnchor="middle" fontSize="12" fill="#94a3b8" transform={`rotate(-90 12 ${height / 2})`}>Messages/min</text>
 					<defs>
@@ -163,14 +172,6 @@ function AreaOperationsChart({ data }: { data: Snapshot[] }) {
 					<div>online: {data[cursor].online}</div>
 				</div>
 			</div>
-			<input
-				type="range"
-				min={0}
-				max={Math.max(0, data.length - 1)}
-				value={cursor}
-				onChange={(e) => setCursor(Number(e.target.value))}
-				className="mt-2 w-full"
-			/>
 		</div>
 	);
 }

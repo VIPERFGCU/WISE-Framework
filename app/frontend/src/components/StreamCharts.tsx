@@ -60,6 +60,16 @@ function defaultXFormatter(v: string | number): string {
   return v;
 }
 
+function pointerIndexFromEvent(
+  event: React.PointerEvent<SVGSVGElement>,
+  length: number,
+): number {
+  const rect = event.currentTarget.getBoundingClientRect();
+  const relX = event.clientX - rect.left;
+  const ratio = Math.max(0, Math.min(1, relX / Math.max(1, rect.width)));
+  return clampIndex(Math.round(ratio * (length - 1)), length - 1);
+}
+
 export function Sparkline({
   data,
   color,
@@ -97,56 +107,52 @@ export function Sparkline({
   const cursorX = scaleX(cursor);
   const cursorY = scaleY(data[cursor]);
 
-  const onPointerMove = (event: React.MouseEvent<SVGSVGElement>) => {
-    const rect = event.currentTarget.getBoundingClientRect();
-    const relX = event.clientX - rect.left;
-    const usable = Math.max(1, rect.width);
-    const ratio = Math.max(0, Math.min(1, relX / usable));
-    const idx = clampIndex(Math.round(ratio * (data.length - 1)), data.length - 1);
-    setCursor(idx);
+  const onPointerMove = (event: React.PointerEvent<SVGSVGElement>) => {
+    setCursor(pointerIndexFromEvent(event, data.length));
+  };
+
+  const onPointerDown = (event: React.PointerEvent<SVGSVGElement>) => {
+    event.currentTarget.setPointerCapture(event.pointerId);
+    setCursor(pointerIndexFromEvent(event, data.length));
   };
 
   const tipLeft = Math.min(g.w - 130, Math.max(g.left + 8, cursorX + 8));
   const tipTop = Math.max(g.top + 4, cursorY - 38);
+  const scrubY = g.h - 16;
   const xDisplay =
     xValues && xValues[cursor] !== undefined
       ? (xValueFormatter ?? defaultXFormatter)(xValues[cursor])
       : `idx ${cursor}`;
 
   return (
-    <div className="space-y-2">
-      <div className="relative">
-        <svg
-          viewBox={`0 0 ${g.w} ${g.h}`}
-          width="100%"
-          height={g.h}
-          onMouseMove={onPointerMove}
-        >
-          <line x1={g.left} y1={g.h - g.bottom} x2={g.w - g.right} y2={g.h - g.bottom} stroke={axisStroke()} strokeWidth={1} />
-          <line x1={g.left} y1={g.top} x2={g.left} y2={g.h - g.bottom} stroke={axisStroke()} strokeWidth={1} />
-          <line x1={g.left} y1={g.top} x2={g.w - g.right} y2={g.top} stroke={gridStroke()} strokeWidth={1} />
-          <line x1={g.left} y1={(g.top + g.h - g.bottom) / 2} x2={g.w - g.right} y2={(g.top + g.h - g.bottom) / 2} stroke={gridStroke()} strokeWidth={1} />
-          <path d={pathD} fill="none" stroke={color} strokeWidth={2} strokeLinejoin="round" strokeLinecap="round" />
-          <line x1={cursorX} y1={g.top} x2={cursorX} y2={g.h - g.bottom} stroke="rgba(15,23,42,0.4)" strokeDasharray="3 3" />
-          <circle cx={cursorX} cy={cursorY} r={3.2} fill={color} />
-          <text x={g.left - 4} y={g.top + 4} textAnchor="end" fontSize="11" fill="#64748b">{max.toFixed(2)}</text>
-          <text x={g.left - 4} y={g.h - g.bottom + 4} textAnchor="end" fontSize="11" fill="#64748b">{min.toFixed(2)}</text>
-          <text x={(g.left + g.w - g.right) / 2} y={g.h - 8} textAnchor="middle" fontSize="11" fill="#64748b">{xLabel}</text>
-          <text x={12} y={(g.top + g.h - g.bottom) / 2} textAnchor="middle" fontSize="11" fill="#64748b" transform={`rotate(-90 12 ${(g.top + g.h - g.bottom) / 2})`}>{yLabel}</text>
-        </svg>
-        <div className="pointer-events-none absolute rounded border border-slate-300 bg-white/95 px-2 py-1 text-xs text-slate-700 shadow" style={{ left: `${(tipLeft / g.w) * 100}%`, top: `${(tipTop / g.h) * 100}%` }}>
-          <div>x: {xDisplay}</div>
-          <div>value: {data[cursor].toFixed(3)}</div>
-        </div>
+    <div className="relative">
+      <svg
+        viewBox={`0 0 ${g.w} ${g.h}`}
+        width="100%"
+        height={g.h}
+        style={{ touchAction: "none" }}
+        onPointerDown={onPointerDown}
+        onPointerMove={onPointerMove}
+      >
+        <line x1={g.left} y1={g.h - g.bottom} x2={g.w - g.right} y2={g.h - g.bottom} stroke={axisStroke()} strokeWidth={1} />
+        <line x1={g.left} y1={g.top} x2={g.left} y2={g.h - g.bottom} stroke={axisStroke()} strokeWidth={1} />
+        <line x1={g.left} y1={g.top} x2={g.w - g.right} y2={g.top} stroke={gridStroke()} strokeWidth={1} />
+        <line x1={g.left} y1={(g.top + g.h - g.bottom) / 2} x2={g.w - g.right} y2={(g.top + g.h - g.bottom) / 2} stroke={gridStroke()} strokeWidth={1} />
+        <path d={pathD} fill="none" stroke={color} strokeWidth={2} strokeLinejoin="round" strokeLinecap="round" />
+        <line x1={cursorX} y1={g.top} x2={cursorX} y2={g.h - g.bottom} stroke="rgba(15,23,42,0.4)" strokeDasharray="3 3" />
+        <line x1={g.left} y1={scrubY} x2={g.w - g.right} y2={scrubY} stroke="rgba(148,163,184,0.5)" strokeWidth={1.5} />
+        <line x1={cursorX} y1={g.h - g.bottom} x2={cursorX} y2={scrubY} stroke="rgba(148,163,184,0.45)" strokeWidth={1} />
+        <circle cx={cursorX} cy={cursorY} r={3.2} fill={color} />
+        <circle cx={cursorX} cy={scrubY} r={5} fill="#ffffff" stroke={color} strokeWidth={2} />
+        <text x={g.left - 4} y={g.top + 4} textAnchor="end" fontSize="11" fill="#64748b">{max.toFixed(2)}</text>
+        <text x={g.left - 4} y={g.h - g.bottom + 4} textAnchor="end" fontSize="11" fill="#64748b">{min.toFixed(2)}</text>
+        <text x={(g.left + g.w - g.right) / 2} y={g.h - 8} textAnchor="middle" fontSize="11" fill="#64748b">{xLabel}</text>
+        <text x={12} y={(g.top + g.h - g.bottom) / 2} textAnchor="middle" fontSize="11" fill="#64748b" transform={`rotate(-90 12 ${(g.top + g.h - g.bottom) / 2})`}>{yLabel}</text>
+      </svg>
+      <div className="pointer-events-none absolute rounded border border-slate-300 bg-white/95 px-2 py-1 text-xs text-slate-700 shadow" style={{ left: `${(tipLeft / g.w) * 100}%`, top: `${(tipTop / g.h) * 100}%` }}>
+        <div>x: {xDisplay}</div>
+        <div>value: {data[cursor].toFixed(3)}</div>
       </div>
-      <input
-        type="range"
-        min={0}
-        max={Math.max(0, data.length - 1)}
-        value={cursor}
-        onChange={(e) => setCursor(Number(e.target.value))}
-        className="w-full"
-      />
     </div>
   );
 }
@@ -189,14 +195,17 @@ export function MultiSparkline({
     return g.top + (1 - (v - min) / (max - min)) * (g.h - g.top - g.bottom);
   };
 
-  const onPointerMove = (event: React.MouseEvent<SVGSVGElement>) => {
-    const rect = event.currentTarget.getBoundingClientRect();
-    const relX = event.clientX - rect.left;
-    const ratio = Math.max(0, Math.min(1, relX / Math.max(1, rect.width)));
-    setCursor(clampIndex(Math.round(ratio * (maxLen - 1)), maxLen - 1));
+  const onPointerMove = (event: React.PointerEvent<SVGSVGElement>) => {
+    setCursor(pointerIndexFromEvent(event, maxLen));
+  };
+
+  const onPointerDown = (event: React.PointerEvent<SVGSVGElement>) => {
+    event.currentTarget.setPointerCapture(event.pointerId);
+    setCursor(pointerIndexFromEvent(event, maxLen));
   };
 
   const cursorX = scaleX(cursor);
+  const scrubY = g.h - 16;
   const xDisplay =
     xValues && xValues[cursor] !== undefined
       ? (xValueFormatter ?? defaultXFormatter)(xValues[cursor])
@@ -223,7 +232,14 @@ export function MultiSparkline({
         ))}
       </div>
       <div className="relative">
-        <svg viewBox={`0 0 ${g.w} ${g.h}`} width="100%" height={g.h} onMouseMove={onPointerMove}>
+        <svg
+          viewBox={`0 0 ${g.w} ${g.h}`}
+          width="100%"
+          height={g.h}
+          style={{ touchAction: "none" }}
+          onPointerDown={onPointerDown}
+          onPointerMove={onPointerMove}
+        >
           <line x1={g.left} y1={g.h - g.bottom} x2={g.w - g.right} y2={g.h - g.bottom} stroke={axisStroke()} strokeWidth={1} />
           <line x1={g.left} y1={g.top} x2={g.left} y2={g.h - g.bottom} stroke={axisStroke()} strokeWidth={1} />
           <line x1={g.left} y1={g.top} x2={g.w - g.right} y2={g.top} stroke={gridStroke()} strokeWidth={1} />
@@ -233,6 +249,9 @@ export function MultiSparkline({
             return <path key={s.label ?? s.color} d={d} fill="none" stroke={s.color} strokeWidth={2} strokeLinejoin="round" strokeLinecap="round" />;
           })}
           <line x1={cursorX} y1={g.top} x2={cursorX} y2={g.h - g.bottom} stroke="rgba(15,23,42,0.4)" strokeDasharray="3 3" />
+          <line x1={g.left} y1={scrubY} x2={g.w - g.right} y2={scrubY} stroke="rgba(148,163,184,0.5)" strokeWidth={1.5} />
+          <line x1={cursorX} y1={g.h - g.bottom} x2={cursorX} y2={scrubY} stroke="rgba(148,163,184,0.45)" strokeWidth={1} />
+          <circle cx={cursorX} cy={scrubY} r={5} fill="#ffffff" stroke="#334155" strokeWidth={2} />
           <text x={g.left - 4} y={g.top + 4} textAnchor="end" fontSize="11" fill="#64748b">{max.toFixed(2)}</text>
           <text x={g.left - 4} y={g.h - g.bottom + 4} textAnchor="end" fontSize="11" fill="#64748b">{min.toFixed(2)}</text>
           <text x={(g.left + g.w - g.right) / 2} y={g.h - 8} textAnchor="middle" fontSize="11" fill="#64748b">{xLabel}</text>
@@ -248,14 +267,6 @@ export function MultiSparkline({
           ))}
         </div>
       </div>
-      <input
-        type="range"
-        min={0}
-        max={Math.max(0, maxLen - 1)}
-        value={cursor}
-        onChange={(e) => setCursor(Number(e.target.value))}
-        className="mt-2 w-full"
-      />
     </div>
   );
 }
@@ -283,12 +294,15 @@ export function SpectrumBars({
 
   const maxAmp = Math.max(...bins.map((b) => b.amplitude), 1e-9);
   const barW = (g.w - g.left - g.right) / bins.length;
+  const scrubY = g.h - 16;
 
-  const onPointerMove = (event: React.MouseEvent<SVGSVGElement>) => {
-    const rect = event.currentTarget.getBoundingClientRect();
-    const relX = event.clientX - rect.left;
-    const ratio = Math.max(0, Math.min(1, relX / Math.max(1, rect.width)));
-    setCursor(clampIndex(Math.round(ratio * (bins.length - 1)), bins.length - 1));
+  const onPointerMove = (event: React.PointerEvent<SVGSVGElement>) => {
+    setCursor(pointerIndexFromEvent(event, bins.length));
+  };
+
+  const onPointerDown = (event: React.PointerEvent<SVGSVGElement>) => {
+    event.currentTarget.setPointerCapture(event.pointerId);
+    setCursor(pointerIndexFromEvent(event, bins.length));
   };
 
   const cursorX = g.left + cursor * barW + barW / 2;
@@ -296,49 +310,49 @@ export function SpectrumBars({
   const selected = bins[cursor];
 
   return (
-    <div className="space-y-2">
-      <div className="relative">
-        <svg viewBox={`0 0 ${g.w} ${g.h}`} width="100%" height={g.h} onMouseMove={onPointerMove}>
-          <line x1={g.left} y1={g.h - g.bottom} x2={g.w - g.right} y2={g.h - g.bottom} stroke={axisStroke()} strokeWidth={1} />
-          <line x1={g.left} y1={g.top} x2={g.left} y2={g.h - g.bottom} stroke={axisStroke()} strokeWidth={1} />
-          <line x1={g.left} y1={g.top} x2={g.w - g.right} y2={g.top} stroke={gridStroke()} strokeWidth={1} />
-          <line x1={g.left} y1={(g.top + g.h - g.bottom) / 2} x2={g.w - g.right} y2={(g.top + g.h - g.bottom) / 2} stroke={gridStroke()} strokeWidth={1} />
-          {bins.map((b, i) => {
-            const x = g.left + i * barW;
-            const barH = ((g.h - g.top - g.bottom) * b.amplitude) / maxAmp;
-            const y = g.h - g.bottom - barH;
-            return (
-              <rect
-                key={`${b.f_hz}-${i}`}
-                x={x}
-                y={y}
-                width={Math.max(1, barW - 1)}
-                height={Math.max(1, barH)}
-                fill={color}
-                opacity={0.85}
-              />
-            );
-          })}
-          <line x1={cursorX} y1={g.top} x2={cursorX} y2={g.h - g.bottom} stroke="rgba(15,23,42,0.4)" strokeDasharray="3 3" />
-          <text x={g.left - 4} y={g.top + 4} textAnchor="end" fontSize="11" fill="#64748b">{maxAmp.toFixed(3)}</text>
-          <text x={g.left - 4} y={g.h - g.bottom + 4} textAnchor="end" fontSize="11" fill="#64748b">0.000</text>
-          <text x={(g.left + g.w - g.right) / 2} y={g.h - 8} textAnchor="middle" fontSize="11" fill="#64748b">{xLabel}</text>
-          <text x={12} y={(g.top + g.h - g.bottom) / 2} textAnchor="middle" fontSize="11" fill="#64748b" transform={`rotate(-90 12 ${(g.top + g.h - g.bottom) / 2})`}>{yLabel}</text>
-        </svg>
-        <div className="pointer-events-none absolute rounded border border-slate-300 bg-white/95 px-2 py-1 text-xs text-slate-700 shadow" style={{ left: `${tipLeft}%`, top: "8%" }}>
-          <div>bin: {cursor}</div>
-          <div>f: {selected.f_hz.toFixed(2)} Hz</div>
-          <div>a: {selected.amplitude.toFixed(4)}</div>
-        </div>
+    <div className="relative">
+      <svg
+        viewBox={`0 0 ${g.w} ${g.h}`}
+        width="100%"
+        height={g.h}
+        style={{ touchAction: "none" }}
+        onPointerDown={onPointerDown}
+        onPointerMove={onPointerMove}
+      >
+        <line x1={g.left} y1={g.h - g.bottom} x2={g.w - g.right} y2={g.h - g.bottom} stroke={axisStroke()} strokeWidth={1} />
+        <line x1={g.left} y1={g.top} x2={g.left} y2={g.h - g.bottom} stroke={axisStroke()} strokeWidth={1} />
+        <line x1={g.left} y1={g.top} x2={g.w - g.right} y2={g.top} stroke={gridStroke()} strokeWidth={1} />
+        <line x1={g.left} y1={(g.top + g.h - g.bottom) / 2} x2={g.w - g.right} y2={(g.top + g.h - g.bottom) / 2} stroke={gridStroke()} strokeWidth={1} />
+        {bins.map((b, i) => {
+          const x = g.left + i * barW;
+          const barH = ((g.h - g.top - g.bottom) * b.amplitude) / maxAmp;
+          const y = g.h - g.bottom - barH;
+          return (
+            <rect
+              key={`${b.f_hz}-${i}`}
+              x={x}
+              y={y}
+              width={Math.max(1, barW - 1)}
+              height={Math.max(1, barH)}
+              fill={color}
+              opacity={0.85}
+            />
+          );
+        })}
+        <line x1={cursorX} y1={g.top} x2={cursorX} y2={g.h - g.bottom} stroke="rgba(15,23,42,0.4)" strokeDasharray="3 3" />
+        <line x1={g.left} y1={scrubY} x2={g.w - g.right} y2={scrubY} stroke="rgba(148,163,184,0.5)" strokeWidth={1.5} />
+        <line x1={cursorX} y1={g.h - g.bottom} x2={cursorX} y2={scrubY} stroke="rgba(148,163,184,0.45)" strokeWidth={1} />
+        <circle cx={cursorX} cy={scrubY} r={5} fill="#ffffff" stroke="#334155" strokeWidth={2} />
+        <text x={g.left - 4} y={g.top + 4} textAnchor="end" fontSize="11" fill="#64748b">{maxAmp.toFixed(3)}</text>
+        <text x={g.left - 4} y={g.h - g.bottom + 4} textAnchor="end" fontSize="11" fill="#64748b">0.000</text>
+        <text x={(g.left + g.w - g.right) / 2} y={g.h - 8} textAnchor="middle" fontSize="11" fill="#64748b">{xLabel}</text>
+        <text x={12} y={(g.top + g.h - g.bottom) / 2} textAnchor="middle" fontSize="11" fill="#64748b" transform={`rotate(-90 12 ${(g.top + g.h - g.bottom) / 2})`}>{yLabel}</text>
+      </svg>
+      <div className="pointer-events-none absolute rounded border border-slate-300 bg-white/95 px-2 py-1 text-xs text-slate-700 shadow" style={{ left: `${tipLeft}%`, top: "8%" }}>
+        <div>bin: {cursor}</div>
+        <div>f: {selected.f_hz.toFixed(2)} Hz</div>
+        <div>a: {selected.amplitude.toFixed(4)}</div>
       </div>
-      <input
-        type="range"
-        min={0}
-        max={Math.max(0, bins.length - 1)}
-        value={cursor}
-        onChange={(e) => setCursor(Number(e.target.value))}
-        className="w-full"
-      />
     </div>
   );
 }
