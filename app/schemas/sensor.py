@@ -90,3 +90,22 @@ class HeartbeatSeries(BaseModel):
                 ]
             }
         }
+
+
+class SpectrumBin(BaseModel):
+    f_hz: float
+    amplitude: float
+
+
+class SpectrumSeries(BaseModel):
+    axis: str
+    sample_rate_hz: float
+    window_samples: int
+    dominant_frequency_hz: Optional[float] = None
+    bins: List[SpectrumBin]
+
+
+class AccelSpectrum(BaseModel):
+    device_id: str
+    range: str
+    spectra: List[SpectrumSeries]

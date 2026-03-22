@@ -1,5 +1,6 @@
 export type StreamPoint = { t: string; x: number; y: number; z: number };
 export type HeartbeatPoint = { t: string; rssi: number };
+export type SpectrumBin = { f_hz: number; amplitude: number };
 
 export function Sparkline({
   data,
@@ -69,5 +70,45 @@ export function MultiSparkline({
         })}
       </svg>
     </div>
+  );
+}
+
+export function SpectrumBars({
+  bins,
+  color,
+  noDataClassName = "text-sm text-gray-500",
+}: {
+  bins: SpectrumBin[];
+  color: string;
+  noDataClassName?: string;
+}) {
+  const w = 600;
+  const h = 140;
+  const pad = 8;
+
+  if (!bins || bins.length === 0) return <div className={noDataClassName}>No spectrum data</div>;
+
+  const maxAmp = Math.max(...bins.map((b) => b.amplitude), 1e-9);
+  const barW = (w - pad * 2) / bins.length;
+
+  return (
+    <svg viewBox={`0 0 ${w} ${h}`} width="100%" height={h}>
+      {bins.map((b, i) => {
+        const x = pad + i * barW;
+        const barH = ((h - pad * 2) * b.amplitude) / maxAmp;
+        const y = h - pad - barH;
+        return (
+          <rect
+            key={`${b.f_hz}-${i}`}
+            x={x}
+            y={y}
+            width={Math.max(1, barW - 1)}
+            height={Math.max(1, barH)}
+            fill={color}
+            opacity={0.85}
+          />
+        );
+      })}
+    </svg>
   );
 }

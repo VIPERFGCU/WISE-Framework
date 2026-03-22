@@ -2,13 +2,14 @@ from __future__ import annotations
 from datetime import datetime
 from typing import List, Optional
 import logging
+import numpy as np
 
 from influxdb_client import InfluxDBClient, Point, WritePrecision
 from influxdb_client.client.write_api import SYNCHRONOUS, WriteApi
 from influxdb_client.client.query_api import QueryApi
 
 from app.core.config import settings
-from app.schemas.sensor import SensorReading, AccelSeries, AccelPoint
+from app.schemas.sensor import SensorReading, AccelSeries, AccelPoint, SpectrumBin, SpectrumSeries
 
 log = logging.getLogger("sensor-backend")
 
@@ -270,3 +271,85 @@ from(bucket: "{settings.influx_bucket}")
         log.debug(f"Heartbeat query error: {e}")
 
     return HeartbeatSeries(device_id=device_id, series=points)
+
+
+def _infer_sample_rate_hz(points: List[AccelPoint]) -> Optional[float]:
+    """Infer sample rate from timestamp deltas using median spacing."""
+    if len(points) < 2:
+        return None
+
+    ts = [p.t.timestamp() for p in points]
+    deltas = [ts[i] - ts[i - 1] for i in range(1, len(ts))]
+    positive = [d for d in deltas if d > 0]
+    if not positive:
+        return None
+
+    dt = float(np.median(np.array(positive, dtype=np.float64)))
+    if dt <= 0:
+        return None
+    return 1.0 / dt
+
+
+def _select_axis_values(points: List[AccelPoint], axis: str) -> np.ndarray:
+    if axis == "x":
+        return np.array([p.x for p in points], dtype=np.float64)
+    if axis == "y":
+        return np.array([p.y for p in points], dtype=np.float64)
+    if axis == "z":
+        return np.array([p.z for p in points], dtype=np.float64)
+    if axis == "mag":
+        return np.sqrt(
+            np.square(np.array([p.x for p in points], dtype=np.float64))
+            + np.square(np.array([p.y for p in points], dtype=np.float64))
+            + np.square(np.array([p.z for p in points], dtype=np.float64))
+        )
+    raise ValueError(f"Unsupported axis '{axis}'")
+
+
+def compute_accel_spectrum(
+        points: List[AccelPoint],
+        axis: str,
+        sample_rate_hz: Optional[float] = None,
+        max_bins: int = 256,
+) -> SpectrumSeries:
+    """Compute one-sided amplitude spectrum for a selected accel axis."""
+    n = len(points)
+    resolved_fs = sample_rate_hz or _infer_sample_rate_hz(points) or 1.0
+
+    if n < 8:
+        return SpectrumSeries(
+            axis=axis,
+            sample_rate_hz=float(resolved_fs),
+            window_samples=n,
+            dominant_frequency_hz=None,
+            bins=[],
+        )
+
+    signal = _select_axis_values(points, axis)
+    # Remove DC and reduce leakage before FFT.
+    signal = signal - np.mean(signal)
+    window = np.hanning(n)
+    windowed = signal * window
+
+    fft_vals = np.fft.rfft(windowed)
+    freqs = np.fft.rfftfreq(n, d=1.0 / resolved_fs)
+    amps = (2.0 / max(1, n)) * np.abs(fft_vals)
+
+    limit = max(0, min(int(max_bins), len(freqs)))
+    bins = [
+        SpectrumBin(f_hz=float(freqs[i]), amplitude=float(amps[i]))
+        for i in range(limit)
+    ]
+
+    dominant_frequency_hz: Optional[float] = None
+    if limit > 1:
+        dominant_idx = int(np.argmax(amps[1:limit])) + 1
+        dominant_frequency_hz = float(freqs[dominant_idx])
+
+    return SpectrumSeries(
+        axis=axis,
+        sample_rate_hz=float(resolved_fs),
+        window_samples=n,
+        dominant_frequency_hz=dominant_frequency_hz,
+        bins=bins,
+    )

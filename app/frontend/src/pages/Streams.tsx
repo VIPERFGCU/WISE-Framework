@@ -1,15 +1,26 @@
 import { useEffect, useState } from "react";
 import { api } from "../api/client";
 import { useRef } from "react";
-import { MultiSparkline, Sparkline, type HeartbeatPoint, type StreamPoint } from "../components/StreamCharts";
+import { MultiSparkline, Sparkline, SpectrumBars, type HeartbeatPoint, type StreamPoint, type SpectrumBin } from "../components/StreamCharts";
 
 const ALL_SENSORS_VALUE = "__all__";
+
+type AxisSpectrum = {
+  axis: string;
+  sample_rate_hz: number;
+  window_samples: number;
+  dominant_frequency_hz: number | null;
+  bins: SpectrumBin[];
+};
 
 export default function Streams() {
   const [device, setDevice] = useState<string>("");
   const [windowS, setWindowS] = useState<number>(60);
+  const [viewMode, setViewMode] = useState<"time" | "frequency">("time");
   const [points, setPoints] = useState<StreamPoint[]>([]);
   const [heartbeatPoints, setHeartbeatPoints] = useState<HeartbeatPoint[]>([]);
+  const [spectra, setSpectra] = useState<AxisSpectrum[]>([]);
+  const [spectrumLoading, setSpectrumLoading] = useState(false);
   const [loading, setLoading] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [downloadingCsv, setDownloadingCsv] = useState(false);
@@ -61,6 +72,12 @@ export default function Streams() {
       // ignore
     }
   }, []);
+
+  const windowToRange = (seconds: number): string => {
+    if (seconds < 60) return `${Math.max(1, seconds)}s`;
+    if (seconds < 3600) return `${Math.max(1, Math.floor(seconds / 60))}m`;
+    return `${Math.max(1, Math.floor(seconds / 3600))}h`;
+  };
 
   const load = async (silent: boolean = false) => {
     try {
@@ -115,6 +132,27 @@ export default function Streams() {
     }
   };
 
+  const loadSpectrum = async () => {
+    if (!device || device === ALL_SENSORS_VALUE) {
+      setSpectra([]);
+      return;
+    }
+    try {
+      setSpectrumLoading(true);
+      const range = windowToRange(windowS);
+      const res = await api.get(`/api/v1/query/accel/spectrum?device_id=${encodeURIComponent(device)}&range=${range}&axes=x,y,z,mag&max_bins=192`);
+      if (Array.isArray(res.data?.spectra)) {
+        setSpectra(res.data.spectra);
+      } else {
+        setSpectra([]);
+      }
+    } catch (e) {
+      setSpectra([]);
+    } finally {
+      setSpectrumLoading(false);
+    }
+  };
+
   useEffect(() => {
     loadDevices();
     const id = setInterval(loadDevices, 10_000);
@@ -123,12 +161,19 @@ export default function Streams() {
 
   useEffect(() => {
     if (!device) return;
-    setPoints([]);
-    setHeartbeatPoints([]);
-    load(false);
-    const id = setInterval(() => load(true), 5000);
+    if (viewMode === "time") {
+      setPoints([]);
+      setHeartbeatPoints([]);
+      load(false);
+      const id = setInterval(() => load(true), 5000);
+      return () => clearInterval(id);
+    }
+
+    setSpectra([]);
+    loadSpectrum();
+    const id = setInterval(() => loadSpectrum(), 5000);
     return () => clearInterval(id);
-  }, [device, windowS]);
+  }, [device, windowS, viewMode]);
 
   const downloadCsv = async () => {
     if (!device) return;
@@ -205,13 +250,24 @@ export default function Streams() {
             </option>
           ))}
         </select>
+        <label className="text-sm self-center">View</label>
+        <select value={viewMode} onChange={(e) => setViewMode(e.target.value as "time" | "frequency")} className="border rounded px-2 py-1 w-full sm:w-32">
+          <option value="time">Time</option>
+          <option value="frequency">Frequency</option>
+        </select>
         <label className="text-sm self-center">Window (s)</label>
         <input type="number" value={windowS} onChange={(e) => setWindowS(Number(e.target.value))} className="border rounded px-2 py-1 w-full sm:w-24" />
-        <button onClick={() => load(false)} className="px-3 py-1 rounded bg-blue-600 text-white w-full sm:w-auto">Refresh</button>
+        <button onClick={() => viewMode === "time" ? load(false) : loadSpectrum()} className="px-3 py-1 rounded bg-blue-600 text-white w-full sm:w-auto">Refresh</button>
       </div>
 
       <div className="bg-white border rounded p-2 sm:p-3">
+        {viewMode === "frequency" && device === ALL_SENSORS_VALUE && (
+          <div className="text-sm text-amber-700 bg-amber-50 border border-amber-200 rounded p-2 mb-3">
+            Frequency view currently supports one device at a time. Select a specific device to compute FFT.
+          </div>
+        )}
         {/* Live stream panel */}
+        {viewMode === "time" && (
         <div className="mb-4 p-2 border rounded bg-gray-50">
           <div className="flex justify-between items-center mb-2">
             <div className="text-sm text-gray-700 font-semibold">Live Stream</div>
@@ -237,15 +293,23 @@ export default function Streams() {
             )}
           </div>
         </div>
+        )}
         {(loading || refreshing) && (
           <div className="text-xs text-gray-500 mb-2">
             {loading ? "Loading…" : "Refreshing…"}
           </div>
         )}
+        {viewMode === "frequency" && spectrumLoading && (
+          <div className="text-xs text-gray-500 mb-2">Computing spectrum…</div>
+        )}
         {!loading && points.length === 0 && heartbeatPoints.length === 0 && (
+          <>
+          {viewMode === "time" && (
           <div className="text-sm text-gray-500">
             No data available. Graphs will appear here when sensor data is available.
           </div>
+          )}
+          </>
         )}
         
         {/* Heartbeat Graph */}
@@ -272,6 +336,20 @@ export default function Streams() {
             <Sparkline data={points.map(p => p.y)} color="#06b6d4" />
             <div className="text-sm text-gray-600 font-semibold mt-4 mb-2">Z axis</div>
             <Sparkline data={points.map(p => p.z)} color="#10b981" />
+          </div>
+        )}
+
+        {viewMode === "frequency" && spectra.length > 0 && (
+          <div className="space-y-6">
+            {spectra.map((s) => (
+              <div key={s.axis}>
+                <div className="text-sm text-gray-700 font-semibold mb-1">{s.axis.toUpperCase()} spectrum</div>
+                <div className="text-xs text-gray-500 mb-2">
+                  Fs={s.sample_rate_hz.toFixed(2)} Hz, N={s.window_samples}, dominant={s.dominant_frequency_hz ? `${s.dominant_frequency_hz.toFixed(2)} Hz` : "n/a"}
+                </div>
+                <SpectrumBars bins={s.bins} color={s.axis === "x" ? "#ef4444" : s.axis === "y" ? "#06b6d4" : s.axis === "z" ? "#10b981" : "#0f172a"} />
+              </div>
+            ))}
           </div>
         )}
       </div>
