@@ -63,11 +63,16 @@ function defaultXFormatter(v: string | number): string {
 function pointerIndexFromEvent(
   event: React.PointerEvent<SVGSVGElement>,
   length: number,
+  geom: ChartGeometry,
 ): number {
   const rect = event.currentTarget.getBoundingClientRect();
-  const relX = event.clientX - rect.left;
-  const ratio = Math.max(0, Math.min(1, relX / Math.max(1, rect.width)));
-  return clampIndex(Math.round(ratio * (length - 1)), length - 1);
+  const leftPx = rect.width * (geom.left / geom.w);
+  const rightPx = rect.width * (geom.right / geom.w);
+  const usable = Math.max(1, rect.width - leftPx - rightPx);
+  const raw = (event.clientX - rect.left - leftPx) / usable;
+  const clamped = Math.max(0, Math.min(1, raw));
+  const boosted = Math.max(0, Math.min(1, (clamped - 0.5) * 1.12 + 0.5));
+  return clampIndex(Math.round(boosted * (length - 1)), length - 1);
 }
 
 export function Sparkline({
@@ -108,12 +113,12 @@ export function Sparkline({
   const cursorY = scaleY(data[cursor]);
 
   const onPointerMove = (event: React.PointerEvent<SVGSVGElement>) => {
-    setCursor(pointerIndexFromEvent(event, data.length));
+    setCursor(pointerIndexFromEvent(event, data.length, g));
   };
 
   const onPointerDown = (event: React.PointerEvent<SVGSVGElement>) => {
     event.currentTarget.setPointerCapture(event.pointerId);
-    setCursor(pointerIndexFromEvent(event, data.length));
+    setCursor(pointerIndexFromEvent(event, data.length, g));
   };
 
   const tipLeft = Math.min(g.w - 130, Math.max(g.left + 8, cursorX + 8));
@@ -139,10 +144,11 @@ export function Sparkline({
         <line x1={g.left} y1={g.top} x2={g.w - g.right} y2={g.top} stroke={gridStroke()} strokeWidth={1} />
         <line x1={g.left} y1={(g.top + g.h - g.bottom) / 2} x2={g.w - g.right} y2={(g.top + g.h - g.bottom) / 2} stroke={gridStroke()} strokeWidth={1} />
         <path d={pathD} fill="none" stroke={color} strokeWidth={2} strokeLinejoin="round" strokeLinecap="round" />
-        <line x1={cursorX} y1={g.top} x2={cursorX} y2={g.h - g.bottom} stroke="rgba(15,23,42,0.4)" strokeDasharray="3 3" />
+        <line x1={cursorX} y1={g.top} x2={cursorX} y2={g.h - g.bottom} stroke="rgba(56,189,248,0.95)" strokeDasharray="6 4" strokeWidth={1.8} />
         <line x1={g.left} y1={scrubY} x2={g.w - g.right} y2={scrubY} stroke="rgba(148,163,184,0.5)" strokeWidth={1.5} />
         <line x1={cursorX} y1={g.h - g.bottom} x2={cursorX} y2={scrubY} stroke="rgba(148,163,184,0.45)" strokeWidth={1} />
-        <circle cx={cursorX} cy={cursorY} r={3.2} fill={color} />
+        <circle cx={cursorX} cy={cursorY} r={5.4} fill="none" stroke="rgba(255,255,255,0.5)" strokeWidth={1.8} />
+        <circle cx={cursorX} cy={cursorY} r={4.2} fill="#ffffff" stroke={color} strokeWidth={2.4} />
         <circle cx={cursorX} cy={scrubY} r={5} fill="#ffffff" stroke={color} strokeWidth={2} />
         <text x={g.left - 4} y={g.top + 4} textAnchor="end" fontSize="11" fill="#64748b">{max.toFixed(2)}</text>
         <text x={g.left - 4} y={g.h - g.bottom + 4} textAnchor="end" fontSize="11" fill="#64748b">{min.toFixed(2)}</text>
@@ -196,12 +202,12 @@ export function MultiSparkline({
   };
 
   const onPointerMove = (event: React.PointerEvent<SVGSVGElement>) => {
-    setCursor(pointerIndexFromEvent(event, maxLen));
+    setCursor(pointerIndexFromEvent(event, maxLen, g));
   };
 
   const onPointerDown = (event: React.PointerEvent<SVGSVGElement>) => {
     event.currentTarget.setPointerCapture(event.pointerId);
-    setCursor(pointerIndexFromEvent(event, maxLen));
+    setCursor(pointerIndexFromEvent(event, maxLen, g));
   };
 
   const cursorX = scaleX(cursor);
@@ -248,7 +254,18 @@ export function MultiSparkline({
             const d = s.data.map((v, i) => `${i === 0 ? "M" : "L"} ${scaleX(i)} ${scaleY(v)}`).join(" ");
             return <path key={s.label ?? s.color} d={d} fill="none" stroke={s.color} strokeWidth={2} strokeLinejoin="round" strokeLinecap="round" />;
           })}
-          <line x1={cursorX} y1={g.top} x2={cursorX} y2={g.h - g.bottom} stroke="rgba(15,23,42,0.4)" strokeDasharray="3 3" />
+          <line x1={cursorX} y1={g.top} x2={cursorX} y2={g.h - g.bottom} stroke="rgba(56,189,248,0.95)" strokeDasharray="6 4" strokeWidth={1.8} />
+          {series.map((s) => {
+            if (s.data.length === 0) return null;
+            const idx = clampIndex(cursor, s.data.length - 1);
+            const y = scaleY(s.data[idx]);
+            return (
+              <g key={`${s.label ?? s.color}-cursor`}>
+                <circle cx={cursorX} cy={y} r={5.4} fill="none" stroke="rgba(255,255,255,0.5)" strokeWidth={1.8} />
+                <circle cx={cursorX} cy={y} r={4.2} fill="#ffffff" stroke={s.color} strokeWidth={2.4} />
+              </g>
+            );
+          })}
           <line x1={g.left} y1={scrubY} x2={g.w - g.right} y2={scrubY} stroke="rgba(148,163,184,0.5)" strokeWidth={1.5} />
           <line x1={cursorX} y1={g.h - g.bottom} x2={cursorX} y2={scrubY} stroke="rgba(148,163,184,0.45)" strokeWidth={1} />
           <circle cx={cursorX} cy={scrubY} r={5} fill="#ffffff" stroke="#334155" strokeWidth={2} />
@@ -297,12 +314,12 @@ export function SpectrumBars({
   const scrubY = g.h - 22;
 
   const onPointerMove = (event: React.PointerEvent<SVGSVGElement>) => {
-    setCursor(pointerIndexFromEvent(event, bins.length));
+    setCursor(pointerIndexFromEvent(event, bins.length, g));
   };
 
   const onPointerDown = (event: React.PointerEvent<SVGSVGElement>) => {
     event.currentTarget.setPointerCapture(event.pointerId);
-    setCursor(pointerIndexFromEvent(event, bins.length));
+    setCursor(pointerIndexFromEvent(event, bins.length, g));
   };
 
   const cursorX = g.left + cursor * barW + barW / 2;
@@ -339,7 +356,7 @@ export function SpectrumBars({
             />
           );
         })}
-        <line x1={cursorX} y1={g.top} x2={cursorX} y2={g.h - g.bottom} stroke="rgba(15,23,42,0.4)" strokeDasharray="3 3" />
+        <line x1={cursorX} y1={g.top} x2={cursorX} y2={g.h - g.bottom} stroke="rgba(56,189,248,0.95)" strokeDasharray="6 4" strokeWidth={1.8} />
         <line x1={g.left} y1={scrubY} x2={g.w - g.right} y2={scrubY} stroke="rgba(148,163,184,0.5)" strokeWidth={1.5} />
         <line x1={cursorX} y1={g.h - g.bottom} x2={cursorX} y2={scrubY} stroke="rgba(148,163,184,0.45)" strokeWidth={1} />
         <circle cx={cursorX} cy={scrubY} r={5} fill="#ffffff" stroke="#334155" strokeWidth={2} />
