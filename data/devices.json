@@ -30,7 +30,7 @@
     "device_id": "bridge-esp32-001",
     "label": null,
     "notes": null,
-    "last_seen": "2026-03-22T17:27:00.198785+00:00",
+    "last_seen": "2026-03-22T17:27:29.547353+00:00",
     "mqtt_key": null,
     "preferred_rate_hz": null,
     "preferred_batch_size": null
@@ -39,7 +39,7 @@
     "device_id": "esp32-test-01",
     "label": null,
     "notes": null,
-    "last_seen": "2026-03-22T17:27:00.206999+00:00",
+    "last_seen": "2026-03-22T17:27:29.555758+00:00",
     "mqtt_key": null,
     "preferred_rate_hz": null,
     "preferred_batch_size": null
@@ -48,7 +48,7 @@
     "device_id": "sim-device-001",
     "label": null,
     "notes": null,
-    "last_seen": "2026-03-22T17:27:00.219057+00:00",
+    "last_seen": "2026-03-22T17:27:29.567461+00:00",
     "mqtt_key": null,
     "preferred_rate_hz": null,
     "preferred_batch_size": null
