@@ -3,7 +3,7 @@
     "device_id": "dev-sensor-001",
     "label": "dev-sensor-001",
     "notes": "Test Node for Development",
-    "last_seen": "2026-03-22T17:23:49.363926+00:00",
+    "last_seen": "2026-03-22T17:45:14.277915+00:00",
     "mqtt_key": null,
     "preferred_rate_hz": 10,
     "preferred_batch_size": 1
@@ -12,7 +12,7 @@
     "device_id": "dev-sensor-002",
     "label": "dev-sensor-002",
     "notes": "Test Node for Development",
-    "last_seen": "2026-03-22T17:23:49.368159+00:00",
+    "last_seen": "2026-03-22T17:45:14.283114+00:00",
     "mqtt_key": null,
     "preferred_rate_hz": 10,
     "preferred_batch_size": 1
@@ -21,7 +21,7 @@
     "device_id": "dev-sensor-003",
     "label": "dev-sensor-003",
     "notes": "Test Node for Development",
-    "last_seen": "2026-03-22T17:23:49.390660+00:00",
+    "last_seen": "2026-03-22T17:45:14.312977+00:00",
     "mqtt_key": null,
     "preferred_rate_hz": 10,
     "preferred_batch_size": 1
@@ -30,7 +30,7 @@
     "device_id": "bridge-esp32-001",
     "label": null,
     "notes": null,
-    "last_seen": "2026-03-22T17:27:29.547353+00:00",
+    "last_seen": "2026-03-22T17:40:14.270175+00:00",
     "mqtt_key": null,
     "preferred_rate_hz": null,
     "preferred_batch_size": null
@@ -39,7 +39,7 @@
     "device_id": "esp32-test-01",
     "label": null,
     "notes": null,
-    "last_seen": "2026-03-22T17:27:29.555758+00:00",
+    "last_seen": "2026-03-22T17:40:14.266115+00:00",
     "mqtt_key": null,
     "preferred_rate_hz": null,
     "preferred_batch_size": null
@@ -48,7 +48,7 @@
     "device_id": "sim-device-001",
     "label": null,
     "notes": null,
-    "last_seen": "2026-03-22T17:27:29.567461+00:00",
+    "last_seen": "2026-03-22T17:40:14.300152+00:00",
     "mqtt_key": null,
     "preferred_rate_hz": null,
     "preferred_batch_size": null
