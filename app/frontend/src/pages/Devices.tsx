@@ -308,10 +308,15 @@ export default function Devices() {
 							>
 								<div className="flex items-start justify-between gap-3 mb-3">
 									<div>
+										<div className="text-[11px] uppercase tracking-wide text-gray-500">Sensor ID</div>
 										<div className="font-mono text-sm break-all">{d.sensor_id}</div>
+										<div className="text-[11px] uppercase tracking-wide text-gray-500 mt-1">Label</div>
 										<div className="text-xs text-gray-500">{d.label ?? "-"}</div>
 									</div>
-									<StatusBadge status={d.status} />
+									<div className="text-right">
+										<div className="text-[11px] uppercase tracking-wide text-gray-500 mb-1">Status</div>
+										<StatusBadge status={d.status} />
+									</div>
 								</div>
 
 								<div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm mb-4">
@@ -334,6 +339,7 @@ export default function Devices() {
 
 								<div className="space-y-3 mb-4">
 									<div className="grid grid-cols-1 gap-2">
+										<div className="text-xs text-gray-500">Frequency (Hz)</div>
 										<input
 											value={freqInputs[d.sensor_id] ?? (d.sample_hz != null ? String(d.sample_hz) : "")}
 											onChange={(e) => setFreqInputs((m) => ({ ...m, [d.sensor_id]: e.target.value }))}
@@ -346,6 +352,7 @@ export default function Devices() {
 										</button>
 									</div>
 									<div className="grid grid-cols-1 gap-2">
+										<div className="text-xs text-gray-500">Batch Size</div>
 										<input
 											value={batchInputs[d.sensor_id] ?? (d.batch_size != null ? String(d.batch_size) : "")}
 											onChange={(e) => setBatchInputs((m) => ({ ...m, [d.sensor_id]: e.target.value }))}
@@ -359,6 +366,7 @@ export default function Devices() {
 									</div>
 								</div>
 
+								<div className="text-xs text-gray-500 mb-2">Actions</div>
 								<div className="grid grid-cols-2 gap-2">
 									<button
 										onClick={() => toggleSensing(d)}
