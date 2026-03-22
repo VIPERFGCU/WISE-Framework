@@ -164,37 +164,37 @@ export default function Streams() {
   };
 
   return (
-    <div className="flex flex-col h-full space-y-4 p-4">
+    <div className="flex flex-col h-full space-y-4 p-2 sm:p-3 md:p-4">
       <div className="flex items-center justify-between gap-3 flex-wrap">
         <h1 className="text-2xl font-bold text-gray-800">Sensor Streams</h1>
-        <div className="flex items-center gap-2">
-          <label className="text-xs text-gray-600">From</label>
+        <div className="grid grid-cols-1 sm:grid-cols-[auto_1fr_auto_1fr_auto] gap-2 w-full lg:w-auto lg:items-center">
+          <label className="text-xs text-gray-600 self-center">From</label>
           <input
             type="datetime-local"
             value={csvFrom}
             onChange={(e) => setCsvFrom(e.target.value)}
-            className="border rounded px-2 py-1 text-sm"
+            className="border rounded px-2 py-1 text-sm min-w-0"
           />
-          <label className="text-xs text-gray-600">To</label>
+          <label className="text-xs text-gray-600 self-center">To</label>
           <input
             type="datetime-local"
             value={csvTo}
             onChange={(e) => setCsvTo(e.target.value)}
-            className="border rounded px-2 py-1 text-sm"
+            className="border rounded px-2 py-1 text-sm min-w-0"
           />
           <button
             onClick={downloadCsv}
             disabled={!device || downloadingCsv}
-            className="px-3 py-1 rounded bg-blue-600 text-white disabled:opacity-60 disabled:cursor-not-allowed"
+            className="px-3 py-1 rounded bg-blue-600 text-white disabled:opacity-60 disabled:cursor-not-allowed w-full sm:w-auto"
           >
             {downloadingCsv ? "Downloading CSV…" : "Download CSV"}
           </button>
         </div>
       </div>
 
-      <div className="flex items-center gap-3">
-        <label className="text-sm">Device ID</label>
-        <select value={device} onChange={(e) => setDevice(e.target.value)} className="border rounded px-2 py-1">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-[auto_1fr_auto_auto_auto] gap-2 lg:items-center">
+        <label className="text-sm self-center">Device ID</label>
+        <select value={device} onChange={(e) => setDevice(e.target.value)} className="border rounded px-2 py-1 min-w-0">
           <option value={ALL_SENSORS_VALUE}>All Sensors</option>
           {devices.length === 0 && (
             <option value={device}>{device}</option>
@@ -205,23 +205,27 @@ export default function Streams() {
             </option>
           ))}
         </select>
-        <label className="text-sm">Window (s)</label>
-        <input type="number" value={windowS} onChange={(e) => setWindowS(Number(e.target.value))} className="border rounded px-2 py-1 w-24" />
-        <button onClick={() => load(false)} className="px-3 py-1 rounded bg-blue-600 text-white">Refresh</button>
+        <label className="text-sm self-center">Window (s)</label>
+        <input type="number" value={windowS} onChange={(e) => setWindowS(Number(e.target.value))} className="border rounded px-2 py-1 w-full sm:w-24" />
+        <button onClick={() => load(false)} className="px-3 py-1 rounded bg-blue-600 text-white w-full sm:w-auto">Refresh</button>
       </div>
 
-      <div className="bg-white border rounded p-3">
+      <div className="bg-white border rounded p-2 sm:p-3">
         {/* Live stream panel */}
         <div className="mb-4 p-2 border rounded bg-gray-50">
           <div className="flex justify-between items-center mb-2">
             <div className="text-sm text-gray-700 font-semibold">Live Stream</div>
             <div className="text-xs text-gray-500">WebSocket</div>
           </div>
-          <div className="flex items-center gap-4">
-            <div className="text-sm text-gray-600">Latest RSSI:</div>
-            <div className="text-sm font-mono">{liveHeartbeat ? liveHeartbeat.rssi : "—"}</div>
-            <div className="ml-6 text-sm text-gray-600">Latest Accel:</div>
-            <div className="text-sm font-mono">{livePoints.length ? `${livePoints[livePoints.length-1].x.toFixed(3)}, ${livePoints[livePoints.length-1].y.toFixed(3)}, ${livePoints[livePoints.length-1].z.toFixed(3)}` : "—"}</div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 sm:gap-4">
+            <div className="text-sm">
+              <span className="text-gray-600">Latest RSSI: </span>
+              <span className="font-mono">{liveHeartbeat ? liveHeartbeat.rssi : "—"}</span>
+            </div>
+            <div className="text-sm min-w-0">
+              <span className="text-gray-600">Latest Accel: </span>
+              <span className="font-mono break-all">{livePoints.length ? `${livePoints[livePoints.length-1].x.toFixed(3)}, ${livePoints[livePoints.length-1].y.toFixed(3)}, ${livePoints[livePoints.length-1].z.toFixed(3)}` : "—"}</span>
+            </div>
           </div>
           <div className="mt-3">
             {livePoints.length > 0 && (

@@ -310,7 +310,7 @@ export default function Dashboard() {
 
 	return (
 		<div className="space-y-4">
-			<div className="flex items-center justify-between">
+			<div className="flex flex-wrap items-center justify-between gap-2">
 				<h2 className="text-lg font-semibold">Operations Overview</h2>
 				<div className="text-xs text-slate-400">Live command center</div>
 			</div>
@@ -329,7 +329,7 @@ export default function Dashboard() {
 				<Card label="Messages / min" value={messagesPerMin} delta={messagesDelta} series={messagesSeries} color="#a78bfa" />
 			</div>
 
-			<div className="grid gap-3 grid-cols-2 xl:grid-cols-4">
+			<div className="grid gap-3 grid-cols-1 sm:grid-cols-2 xl:grid-cols-4">
 				<UniformMetricCard label="Total Sensors" value={total} />
 				<UniformMetricCard label="Updating" value={updating} />
 				<UniformMetricCard label="Offline" value={off} tone={off > 0 ? "warn" : "good"} />
@@ -340,7 +340,7 @@ export default function Dashboard() {
 				<div className="xl:col-span-8">
 					<AreaOperationsChart data={operationsSeries} />
 				</div>
-				<div className="xl:col-span-4 rounded border border-slate-700 bg-slate-900/40 p-4">
+				<div className="xl:col-span-4 rounded border border-slate-700 bg-slate-900/40 p-3 sm:p-4">
 					<div className="text-xs uppercase tracking-wide text-slate-400 mb-3">Sensor Spotlights</div>
 					<div className="space-y-3">
 						{topSensors.length === 0 && <div className="text-sm text-slate-400">No sensors discovered yet</div>}
@@ -359,12 +359,12 @@ export default function Dashboard() {
 			</div>
 
 			<div className="grid gap-3 xl:grid-cols-12">
-				<div className="xl:col-span-8 rounded border border-slate-700 bg-slate-900/40 p-4">
+				<div className="xl:col-span-8 rounded border border-slate-700 bg-slate-900/40 p-3 sm:p-4">
 					<div className="mb-3 flex items-center justify-between">
 						<div className="text-xs uppercase tracking-wide text-slate-400">Sensor Locations</div>
 						<div className="text-xs text-slate-400">{total} sensors mapped</div>
 					</div>
-					<div className="relative h-[320px] rounded border border-slate-700 bg-slate-950/70 overflow-hidden">
+					<div className="relative h-[240px] sm:h-[280px] lg:h-[320px] rounded border border-slate-700 bg-slate-950/70 overflow-hidden">
 						<iframe
 							title="Southwest Florida Map"
 							className="h-full w-full"
@@ -376,7 +376,7 @@ export default function Dashboard() {
 					</div>
 				</div>
 
-				<div className="xl:col-span-4 rounded border border-slate-700 bg-slate-900/40 p-4">
+				<div className="xl:col-span-4 rounded border border-slate-700 bg-slate-900/40 p-3 sm:p-4">
 					<div className="text-xs uppercase tracking-wide text-slate-400 mb-3">Recent Sensor Activity</div>
 					<div className="space-y-3">
 						{activityItems.length === 0 && <div className="text-sm text-slate-400">No recent activity</div>}
@@ -384,7 +384,7 @@ export default function Dashboard() {
 							const ts = parseIsoMs(item.updatedAt);
 							return (
 								<div key={item.sensorId} className="pb-2 border-b border-slate-700/60 last:border-b-0">
-									<div className="text-sm font-medium text-slate-100 truncate">{item.sensorId}</div>
+									<div className="text-sm font-medium text-slate-100 break-all">{item.sensorId}</div>
 									<div className="text-xs text-slate-400 mt-0.5">{item.status.toUpperCase()}</div>
 									<div className="text-xs text-slate-500 mt-1">{Number.isFinite(ts) ? new Date(ts).toLocaleString() : "Unknown update time"}</div>
 								</div>
