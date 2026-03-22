@@ -26,6 +26,13 @@ export default function Devices() {
   	"transition-colors duration-150",
   ].join(" ");
 
+	const btnMobile = [
+		"px-3 py-2 text-xs rounded border border-blue-500 text-blue-600 bg-blue-50",
+		"hover:bg-blue-100 hover:text-blue-700 hover:shadow-sm active:bg-blue-200",
+		"disabled:opacity-60 text-center font-medium w-full",
+		"transition-colors duration-150",
+	].join(" ");
+
 	// per-row action loading states
 	const [senseBusy, setSenseBusy] = useState<Record<string, boolean>>({});
 
@@ -296,10 +303,10 @@ export default function Devices() {
 						return (
 							<section
 								key={d.sensor_id}
-								className={`rounded border p-3 bg-white ${stale ? "opacity-80 bg-gray-50" : ""}`}
+								className={`rounded border p-4 bg-white ${stale ? "opacity-80 bg-gray-50" : ""}`}
 								title={Number.isFinite(t) ? new Date(t).toLocaleString() : "unknown"}
 							>
-								<div className="flex items-start justify-between gap-3 mb-2">
+								<div className="flex items-start justify-between gap-3 mb-3">
 									<div>
 										<div className="font-mono text-sm break-all">{d.sensor_id}</div>
 										<div className="text-xs text-gray-500">{d.label ?? "-"}</div>
@@ -307,7 +314,7 @@ export default function Devices() {
 									<StatusBadge status={d.status} />
 								</div>
 
-								<div className="grid grid-cols-2 gap-2 text-sm mb-3">
+								<div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm mb-4">
 									<div>
 										<div className="text-xs text-gray-500">Sensing</div>
 										<BoolPill value={d.sensing} />
@@ -316,7 +323,7 @@ export default function Devices() {
 										<div className="text-xs text-gray-500">Up time</div>
 										<div>{formatUptime(d.uptime_seconds)}</div>
 									</div>
-									<div className="col-span-2">
+									<div className="sm:col-span-2">
 										<div className="text-xs text-gray-500">Last Updated</div>
 										<div>
 											{Number.isFinite(t) ? timeAgo(Date.now() - t) : "-"}
@@ -325,43 +332,43 @@ export default function Devices() {
 									</div>
 								</div>
 
-								<div className="space-y-2 mb-3">
-									<div className="flex items-center gap-2">
+								<div className="space-y-3 mb-4">
+									<div className="grid grid-cols-1 gap-2">
 										<input
 											value={freqInputs[d.sensor_id] ?? (d.sample_hz != null ? String(d.sample_hz) : "")}
 											onChange={(e) => setFreqInputs((m) => ({ ...m, [d.sensor_id]: e.target.value }))}
 											inputMode="numeric"
-											className="border rounded px-2 py-1 text-sm flex-1"
+											className="border rounded px-3 py-2 text-sm w-full"
 											placeholder="Hz"
 										/>
-										<button onClick={() => applyFrequency(d)} className={btn}>
+										<button onClick={() => applyFrequency(d)} className={btnMobile}>
 											{freqBusy[d.sensor_id] ? "..." : "Apply"}
 										</button>
 									</div>
-									<div className="flex items-center gap-2">
+									<div className="grid grid-cols-1 gap-2">
 										<input
 											value={batchInputs[d.sensor_id] ?? (d.batch_size != null ? String(d.batch_size) : "")}
 											onChange={(e) => setBatchInputs((m) => ({ ...m, [d.sensor_id]: e.target.value }))}
 											inputMode="numeric"
-											className="border rounded px-2 py-1 text-sm flex-1"
+											className="border rounded px-3 py-2 text-sm w-full"
 											placeholder="batch"
 										/>
-										<button onClick={() => applyBatch(d)} className={btn}>
-											{batchBusy[d.sensor_id] ? "..." : "Apply"}
+										<button onClick={() => applyBatch(d)} className={btnMobile}>
+											{batchBusy[d.sensor_id] ? "..." : "Apply Batch"}
 										</button>
 									</div>
 								</div>
 
-								<div className="flex items-center gap-2">
+								<div className="grid grid-cols-2 gap-2">
 									<button
 										onClick={() => toggleSensing(d)}
 										disabled={!!senseBusy[d.sensor_id]}
-										className={btn}
+										className={btnMobile}
 										title={d.sensing ? "Stop sensing" : "Start sensing"}
 									>
 										{senseBusy[d.sensor_id] ? "..." : d.sensing ? "Stop Sense" : "Start Sense"}
 									</button>
-									<button onClick={() => setDrawerFor(d)} className={btn} title="View details">
+									<button onClick={() => setDrawerFor(d)} className={btnMobile} title="View details">
 										Details
 									</button>
 								</div>
