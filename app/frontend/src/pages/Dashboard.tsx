@@ -38,11 +38,6 @@ function MiniSparkline({ data, color }: { data: number[]; color: string }) {
 	const right = 4;
 	const top = 6;
 	const bottom = 16;
-	const [cursor, setCursor] = useState(0);
-
-	useEffect(() => {
-		setCursor(Math.max(0, data.length - 1));
-	}, [data.length]);
 
 	if (!data.length) return <div className="h-[34px]" />;
 	const min = Math.min(...data);
@@ -53,9 +48,6 @@ function MiniSparkline({ data, color }: { data: number[]; color: string }) {
 		return top + (1 - (value - min) / (max - min)) * (height - top - bottom);
 	};
 	const d = data.map((value, index) => `${index === 0 ? "M" : "L"} ${scaleX(index)} ${scaleY(value)}`).join(" ");
-	const cursorX = scaleX(cursor);
-	const cursorY = scaleY(data[cursor] ?? data[data.length - 1]);
-	const scrubY = height - 8;
 
 	return (
 		<div className="relative">
@@ -63,27 +55,15 @@ function MiniSparkline({ data, color }: { data: number[]; color: string }) {
 				viewBox={`0 0 ${width} ${height}`}
 				width="100%"
 				height={height}
-				style={{ touchAction: "none" }}
-				onPointerDown={(e) => {
-					e.currentTarget.setPointerCapture(e.pointerId);
-					setCursor(pointerIndexFromEvent(e, data.length));
-				}}
-				onPointerMove={(e) => {
-					setCursor(pointerIndexFromEvent(e, data.length));
-				}}
 			>
 				<line x1={left} y1={height - bottom} x2={width - right} y2={height - bottom} stroke="rgba(148,163,184,0.6)" strokeWidth="1" />
 				<line x1={left} y1={top} x2={left} y2={height - bottom} stroke="rgba(148,163,184,0.6)" strokeWidth="1" />
+				<line x1={left} y1={top} x2={width - right} y2={top} stroke="rgba(148,163,184,0.22)" strokeWidth="1" />
+				<line x1={left} y1={(top + height - bottom) / 2} x2={width - right} y2={(top + height - bottom) / 2} stroke="rgba(148,163,184,0.22)" strokeWidth="1" />
 				<path d={d} fill="none" stroke={color} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
-				<line x1={cursorX} y1={top} x2={cursorX} y2={height - bottom} stroke="rgba(148,163,184,0.5)" strokeDasharray="2 2" />
-				<line x1={left} y1={scrubY} x2={width - right} y2={scrubY} stroke="rgba(148,163,184,0.5)" strokeWidth="1.5" />
-				<line x1={cursorX} y1={height - bottom} x2={cursorX} y2={scrubY} stroke="rgba(148,163,184,0.45)" strokeWidth="1" />
-				<circle cx={cursorX} cy={cursorY} r={2.5} fill={color} />
-				<circle cx={cursorX} cy={scrubY} r={3.8} fill="#ffffff" stroke={color} strokeWidth={1.8} />
+				<text x={left - 2} y={top + 3} textAnchor="end" fontSize="8" fill="#94a3b8">{max.toFixed(1)}</text>
+				<text x={left - 2} y={height - bottom + 3} textAnchor="end" fontSize="8" fill="#94a3b8">{min.toFixed(1)}</text>
 			</svg>
-			<div className="pointer-events-none absolute rounded border border-slate-600 bg-slate-900/95 px-1.5 py-1 text-[10px] text-slate-200" style={{ left: `${Math.min(72, Math.max(4, (cursorX / width) * 100))}%`, top: "4px" }}>
-				{(data[cursor] ?? 0).toFixed(1)}
-			</div>
 		</div>
 	);
 }
