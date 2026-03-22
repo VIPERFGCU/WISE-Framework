@@ -9,6 +9,24 @@ from passlib.context import CryptContext
 
 from app.core.config import settings
 
+
+def _normalize_role_name(role: str) -> str:
+    val = role.strip().lower()
+    aliases = {
+        "view": "viewer",
+    }
+    return aliases.get(val, val)
+
+
+def _normalized_roles(roles: list[str]) -> set[str]:
+    return {_normalize_role_name(r) for r in roles}
+
+
+def _has_required_role(user_roles: list[str], required_role: str) -> bool:
+    normalized_user_roles = _normalized_roles(user_roles)
+    req = _normalize_role_name(required_role)
+    return req in normalized_user_roles or "admin" in normalized_user_roles
+
 # Password hashing
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
@@ -60,7 +78,7 @@ def get_current_user(token: str = Depends(oauth2_scheme)) -> dict:
 def require_role(role: str) -> Callable:
     def _checker(user: dict = Depends(get_current_user)) -> dict:
         roles = user.get("roles", [])
-        if role not in roles:
+        if not _has_required_role(roles, role):
             raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=f"Missing role: {role}")
         return user
     return _checker
@@ -94,10 +112,11 @@ def require_api_key_or_role(role: Optional[str] = None):
         if not data:
             raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid or expired token")
 
-        if role and role not in data.get("roles", []):
+        user_roles = data.get("roles", [])
+        if role and not _has_required_role(user_roles, role):
             raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=f"Missing role: {role}")
 
-        return {"auth": "jwt", "user": data.get("sub"), "roles": data.get("roles", [])}
+        return {"auth": "jwt", "user": data.get("sub"), "roles": user_roles}
 
     return _either
 

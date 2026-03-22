@@ -7,6 +7,25 @@ from fastapi import Depends, HTTPException, status
 from app.core.config import settings
 from app.core import security
 
+
+def _normalize_role_name(role: str) -> str:
+    val = role.strip().lower()
+    aliases = {
+        "view": "viewer",
+    }
+    return aliases.get(val, val)
+
+
+def _normalized_roles(roles: list[str]) -> set[str]:
+    return {_normalize_role_name(r) for r in roles}
+
+
+def _has_required_role(user_roles: list[str], required_role: str) -> bool:
+    normalized_user_roles = _normalized_roles(user_roles)
+    req = _normalize_role_name(required_role)
+    # Admin users implicitly satisfy lower-privilege checks such as viewer.
+    return req in normalized_user_roles or "admin" in normalized_user_roles
+
 # Influx client dependency
 @lru_cache(maxsize=1)
 def get_influx_client() -> Optional[InfluxDBClient]:
@@ -48,7 +67,7 @@ def require_role(role: str):
     """Dependency factory to enforce a specific role from JWT."""
     def _checker(user: dict = Depends(get_current_user)):
         roles = user.get("roles", [])
-        if role not in roles:
+        if not _has_required_role(roles, role):
             raise HTTPException(
                     status_code=status.HTTP_403_FORBIDDEN,
                     detail=f"Missing role: {role}",
@@ -60,8 +79,9 @@ def require_role(role: str):
 def require_any_role(*roles: str):
     """Allow access if the user has ANY of the listed roles."""
     def _checker(user: dict = Depends(get_current_user)):
-        user_roles = set(user.get("roles", []))
-        if not user_roles.intersection(roles):
+        user_roles = user.get("roles", [])
+        normalized_required = {_normalize_role_name(r) for r in roles}
+        if not any(_has_required_role(user_roles, r) for r in normalized_required):
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail=f"Missing any of roles: {', '.join(roles)}",

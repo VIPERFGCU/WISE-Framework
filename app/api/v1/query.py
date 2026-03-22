@@ -24,8 +24,7 @@ async def get_accel(
 @router.get(
         "/accel/spectrum",
         response_model=AccelSpectrum,
-        summary="Get accelerometer frequency-domain spectrum",
-        dependencies=[Depends(deps.require_role("viewer"))],
+    summary="Get accelerometer frequency-domain spectrum",
 )
 async def get_accel_spectrum(
     device_id: str = Query(..., description="Device id tag"),
