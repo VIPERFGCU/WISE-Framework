@@ -181,6 +181,9 @@ export default function SensorProfile() {
                     <Sparkline
                       data={heartbeatPoints.map((p) => p.rssi)}
                       color="#8b5cf6"
+                      xValues={heartbeatPoints.map((p) => p.t)}
+                      xLabel="Time"
+                      yLabel="RSSI"
                       noDataClassName="text-sm text-slate-400"
                     />
                   </div>
@@ -192,6 +195,9 @@ export default function SensorProfile() {
                     <MultiSparkline
                       legendClassName="flex items-center gap-3 text-xs text-slate-400 mb-1"
                       noDataClassName="text-sm text-slate-400"
+                      xValues={points.map((p) => p.t)}
+                      xLabel="Time"
+                      yLabel="Accel"
                       series={[
                         { data: points.map((p) => p.x), color: "#ef4444", label: "X" },
                         { data: points.map((p) => p.y), color: "#06b6d4", label: "Y" },
@@ -201,13 +207,13 @@ export default function SensorProfile() {
 
                     <div className="h-4" />
                     <div className="text-sm text-slate-300 font-semibold mb-2">X axis</div>
-                    <Sparkline data={points.map((p) => p.x)} color="#ef4444" noDataClassName="text-sm text-slate-400" />
+                    <Sparkline data={points.map((p) => p.x)} color="#ef4444" xValues={points.map((p) => p.t)} xLabel="Time" yLabel="X" noDataClassName="text-sm text-slate-400" />
 
                     <div className="text-sm text-slate-300 font-semibold mt-4 mb-2">Y axis</div>
-                    <Sparkline data={points.map((p) => p.y)} color="#06b6d4" noDataClassName="text-sm text-slate-400" />
+                    <Sparkline data={points.map((p) => p.y)} color="#06b6d4" xValues={points.map((p) => p.t)} xLabel="Time" yLabel="Y" noDataClassName="text-sm text-slate-400" />
 
                     <div className="text-sm text-slate-300 font-semibold mt-4 mb-2">Z axis</div>
-                    <Sparkline data={points.map((p) => p.z)} color="#10b981" noDataClassName="text-sm text-slate-400" />
+                    <Sparkline data={points.map((p) => p.z)} color="#10b981" xValues={points.map((p) => p.t)} xLabel="Time" yLabel="Z" noDataClassName="text-sm text-slate-400" />
                   </div>
                 )}
               </section>

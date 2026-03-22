@@ -289,7 +289,7 @@ export default function Streams() {
                 { data: livePoints.map(p => p.x), color: '#ef4444', label: 'X' },
                 { data: livePoints.map(p => p.y), color: '#06b6d4', label: 'Y' },
                 { data: livePoints.map(p => p.z), color: '#10b981', label: 'Z' }
-              ]} />
+              ]} xValues={livePoints.map((p) => p.t)} xLabel="Time" yLabel="Accel" />
             )}
           </div>
         </div>
@@ -316,7 +316,13 @@ export default function Streams() {
         {heartbeatPoints.length > 0 && (
           <div className="mb-6">
             <div className="text-sm text-gray-600 font-semibold mb-2">Signal Strength (RSSI)</div>
-            <Sparkline data={heartbeatPoints.map(p => p.rssi)} color="#8b5cf6" />
+            <Sparkline
+              data={heartbeatPoints.map(p => p.rssi)}
+              color="#8b5cf6"
+              xValues={heartbeatPoints.map((p) => p.t)}
+              xLabel="Time"
+              yLabel="RSSI"
+            />
           </div>
         )}
 
@@ -328,14 +334,14 @@ export default function Streams() {
               { data: points.map(p => p.x), color: '#ef4444', label: 'X' },
               { data: points.map(p => p.y), color: '#06b6d4', label: 'Y' },
               { data: points.map(p => p.z), color: '#10b981', label: 'Z' }
-            ]} />
+            ]} xValues={points.map((p) => p.t)} xLabel="Time" yLabel="Accel" />
             <div className="h-4" />
             <div className="text-sm text-gray-600 font-semibold mb-2">X axis</div>
-            <Sparkline data={points.map(p => p.x)} color="#ef4444" />
+            <Sparkline data={points.map(p => p.x)} color="#ef4444" xValues={points.map((p) => p.t)} xLabel="Time" yLabel="X" />
             <div className="text-sm text-gray-600 font-semibold mt-4 mb-2">Y axis</div>
-            <Sparkline data={points.map(p => p.y)} color="#06b6d4" />
+            <Sparkline data={points.map(p => p.y)} color="#06b6d4" xValues={points.map((p) => p.t)} xLabel="Time" yLabel="Y" />
             <div className="text-sm text-gray-600 font-semibold mt-4 mb-2">Z axis</div>
-            <Sparkline data={points.map(p => p.z)} color="#10b981" />
+            <Sparkline data={points.map(p => p.z)} color="#10b981" xValues={points.map((p) => p.t)} xLabel="Time" yLabel="Z" />
           </div>
         )}
 
