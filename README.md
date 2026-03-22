@@ -53,3 +53,11 @@ fastapi-backend/
   ├─ docker-compose.yml
   └─ README.md
 ```
+
+## Documentation
+
+Use the in-repo docs as the source of truth:
+
+- [Documentation Hub](docs/README.md)
+- [Section README template](docs/templates/section-readme-template.md)
+- [Runbook template](docs/templates/runbook-template.md)
