@@ -11,6 +11,7 @@ type Tri = "all" | "yes" | "no";
 type SortKey = "uptime_asc" | "uptime_desc" | "status";
 
 const STALE_SEC = 120; // mark devices stale if no update within 2 minutes
+const LEGACY_SENSOR_IDS = new Set(["bridge-esp32-001", "esp32-test-01", "sim-device-001"]);
 
 export default function Devices() {
   const [devices, setDevices] = useState<Device[]>([]);
@@ -82,6 +83,7 @@ export default function Devices() {
   //filter
   const rows = useMemo(() => {
 		let out = devices.filter((d) => {
+			if (LEGACY_SENSOR_IDS.has(d.sensor_id)) return false;
 			if (status !== "all" && d.status !== status) return false;
 			if (sense !== "all" && d.sensing !== (sense === "yes")) return false;
 			if (q && !d.sensor_id.toLowerCase().includes(q.toLowerCase())) return false;
@@ -124,6 +126,40 @@ export default function Devices() {
 	  }
   };
 
+	const applyFrequency = async (d: Device) => {
+		const hz = Number(freqInputs[d.sensor_id]);
+		if (!Number.isFinite(hz) || hz <= 0) {
+			emitError("Enter a positive number for frequency.");
+			return;
+		}
+		setFreqBusy((m) => ({ ...m, [d.sensor_id]: true }));
+		try {
+			await setFrequency(d.sensor_id, hz);
+			await load();
+		} catch (e: any) {
+			emitError(e?.message ?? "Failed to set frequency");
+		} finally {
+			setFreqBusy((m) => ({ ...m, [d.sensor_id]: false }));
+		}
+	};
+
+	const applyBatch = async (d: Device) => {
+		const bs = Number(batchInputs[d.sensor_id]);
+		if (!Number.isFinite(bs) || bs <= 0) {
+			emitError("Enter a positive integer for batch size.");
+			return;
+		}
+		setBatchBusy((m) => ({ ...m, [d.sensor_id]: true }));
+		try {
+			await setBatchSize(d.sensor_id, bs);
+			await load();
+		} catch (e: any) {
+			emitError(e?.message ?? "Failed to set batch size");
+		} finally {
+			setBatchBusy((m) => ({ ...m, [d.sensor_id]: false }));
+		}
+	};
+
 
   return (
     <div className="space-y-4">
@@ -143,16 +179,16 @@ export default function Devices() {
       </div>
 
       {/* Global controls */}
-      <div className="bg-white border rounded p-3 flex flex-wrap items-end gap-3">
+      <div className="bg-white border rounded p-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-[1fr_1fr_auto]">
       	<div>
-	   <label className="block test-xs text-gray-600 mb-1">
+	   <label className="block text-xs text-gray-600 mb-1">
 	   	All sensors: Frequency (Hz)
 	   </label>
 	   <input
 	      value={globalHz}
 	      onChange={(e) => setGlobalHz(e.target.value)}
 	      inputMode="numeric"
-	      className="border rounded px-3 py-2 text-sm w-40"
+	      className="border rounded px-3 py-2 text-sm w-full"
 	      placeholder="e.g. 50"
 	   />
 	</div>
@@ -164,7 +200,7 @@ export default function Devices() {
 	      value={globalBatch}
 	      onChange={(e) => setGlobalBatch(e.target.value)}
 	      inputMode="numeric"
-	      className="border rounded px-3 py-2 text-sm w-40"
+	      className="border rounded px-3 py-2 text-sm w-full"
 	      placeholder="e.g. 100"
 	   />
 	</div>
@@ -197,19 +233,19 @@ export default function Devices() {
 			   setGlobalBusy(false);
 		   }
 	   }}
-	   className="px-3 py-2 text-sm rounded bg-black text-white disabled:opacity-60"
+	   className="px-3 py-2 text-sm rounded bg-black text-white disabled:opacity-60 sm:w-fit w-full"
 	 >
 	   {globalBusy ? "Applying..." : "Apply to All"}
 	 </button>
        </div>
       	      
-      {/* Controls */}
-      <div className="bg-white border rounded p-3 grid gap-2 md:grid-cols-5">
+	{/* Controls */}
+	<div className="bg-white border rounded p-3 grid gap-2 grid-cols-1 sm:grid-cols-2 lg:grid-cols-5">
         <input
           value={q}
           onChange={(e) => setQ(e.target.value)}
           placeholder="Search sensor id…"
-          className="border rounded px-3 py-2 text-sm md:col-span-2"
+		  className="border rounded px-3 py-2 text-sm sm:col-span-2 lg:col-span-2"
         />
         <select
           value={status}
@@ -236,7 +272,7 @@ export default function Devices() {
         <select
           value={sortKey}
           onChange={(e) => setSortKey(e.target.value as SortKey)}
-          className="border rounded px-3 py-2 text-sm md:col-span-2"
+					className="border rounded px-3 py-2 text-sm sm:col-span-2 lg:col-span-2"
           title="Sort"
         >
           <option value="uptime_desc">Sort: Uptime ↓</option>
@@ -252,8 +288,95 @@ export default function Devices() {
         <div className="text-gray-600">No devices match your filters.</div>
       )}
 
-      {!loading && !error && rows.length > 0 && (
-        <div className="overflow-x-auto">
+			{!loading && !error && rows.length > 0 && (
+				<div className="space-y-3 md:hidden">
+					{rows.map((d) => {
+						const t = parseIsoMs(d.updated_at);
+						const stale = isStale(d);
+						return (
+							<section
+								key={d.sensor_id}
+								className={`rounded border p-3 bg-white ${stale ? "opacity-80 bg-gray-50" : ""}`}
+								title={Number.isFinite(t) ? new Date(t).toLocaleString() : "unknown"}
+							>
+								<div className="flex items-start justify-between gap-3 mb-2">
+									<div>
+										<div className="font-mono text-sm break-all">{d.sensor_id}</div>
+										<div className="text-xs text-gray-500">{d.label ?? "-"}</div>
+									</div>
+									<StatusBadge status={d.status} />
+								</div>
+
+								<div className="grid grid-cols-2 gap-2 text-sm mb-3">
+									<div>
+										<div className="text-xs text-gray-500">Sensing</div>
+										<BoolPill value={d.sensing} />
+									</div>
+									<div>
+										<div className="text-xs text-gray-500">Up time</div>
+										<div>{formatUptime(d.uptime_seconds)}</div>
+									</div>
+									<div className="col-span-2">
+										<div className="text-xs text-gray-500">Last Updated</div>
+										<div>
+											{Number.isFinite(t) ? timeAgo(Date.now() - t) : "-"}
+											{stale && <span className="ml-2 inline-block h-2 w-2 rounded-full bg-red-500 align-middle" />}
+										</div>
+									</div>
+								</div>
+
+								<div className="space-y-2 mb-3">
+									<div className="flex items-center gap-2">
+										<input
+											value={freqInputs[d.sensor_id] ?? (d.sample_hz != null ? String(d.sample_hz) : "")}
+											onChange={(e) => setFreqInputs((m) => ({ ...m, [d.sensor_id]: e.target.value }))}
+											inputMode="numeric"
+											className="border rounded px-2 py-1 text-sm flex-1"
+											placeholder="Hz"
+										/>
+										<button onClick={() => applyFrequency(d)} className={btn}>
+											{freqBusy[d.sensor_id] ? "..." : "Apply"}
+										</button>
+									</div>
+									<div className="flex items-center gap-2">
+										<input
+											value={batchInputs[d.sensor_id] ?? (d.batch_size != null ? String(d.batch_size) : "")}
+											onChange={(e) => setBatchInputs((m) => ({ ...m, [d.sensor_id]: e.target.value }))}
+											inputMode="numeric"
+											className="border rounded px-2 py-1 text-sm flex-1"
+											placeholder="batch"
+										/>
+										<button onClick={() => applyBatch(d)} className={btn}>
+											{batchBusy[d.sensor_id] ? "..." : "Apply"}
+										</button>
+									</div>
+								</div>
+
+								<div className="flex items-center gap-2">
+									<button
+										onClick={() => toggleSensing(d)}
+										disabled={!!senseBusy[d.sensor_id]}
+										className={btn}
+										title={d.sensing ? "Stop sensing" : "Start sensing"}
+									>
+										{senseBusy[d.sensor_id] ? "..." : d.sensing ? "Stop Sense" : "Start Sense"}
+									</button>
+									<button onClick={() => setDrawerFor(d)} className={btn} title="View details">
+										Details
+									</button>
+								</div>
+							</section>
+						);
+					})}
+
+					<div className="text-xs text-gray-500">
+						Devices marked light gray are considered <span className="font-medium">stale</span> (no update in &gt; {STALE_SEC}s).
+					</div>
+				</div>
+			)}
+
+			{!loading && !error && rows.length > 0 && (
+				<div className="hidden md:block overflow-x-auto">
           <table className="min-w-full bg-white border rounded">
             <thead className="text-left text-sm text-gray-600 border-b">
               <tr>
@@ -293,17 +416,7 @@ export default function Devices() {
 				placeholder="Hz"
 			  />
 			  <button
-				onClick={async () => {
-				const v = freqInputs[d.sensor_id];
-				const hz = Number(v);
-				if (!Number.isFinite(hz) || hz <= 0) { emitError("Enter a positive number for frequency."); return; }
-				setFreqBusy((m) => ({ ...m, [d.sensor_id]: true }));
-				try {
-					await setFrequency(d.sensor_id, hz);
-					await load();
-				} catch (e: any) { emitError(e?.message ?? "Failed to set frequency"); }
-				finally { setFreqBusy((m) => ({ ...m, [d.sensor_id]: false })); }
-				}}
+				onClick={() => applyFrequency(d)}
 				className={btn}
 			  >
 				{freqBusy[d.sensor_id] ? "..." : "Apply"}
@@ -321,17 +434,7 @@ export default function Devices() {
 				placeholder="batch"
 			  />
 			  <button
-				onClick={async () => {
-				const v = batchInputs[d.sensor_id];
-				const bs = Number(v);
-				if (!Number.isFinite(bs) || bs <= 0) { emitError("Enter a positive integer for batch size."); return; }
-				setBatchBusy((m) => ({ ...m, [d.sensor_id]: true }));
-				try {
-					await setBatchSize(d.sensor_id, bs);
-					await load();
-				} catch (e: any) { emitError(e?.message ?? "Failed to set batch size"); }
-				finally { setBatchBusy((m) => ({ ...m, [d.sensor_id]: false })); }
-				}}
+				onClick={() => applyBatch(d)}
 				className={btn}
 			  >
 				{batchBusy[d.sensor_id] ? "..." : "Apply"}

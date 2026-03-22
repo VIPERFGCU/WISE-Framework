@@ -8,6 +8,16 @@ from typing import Optional, Dict, List
 _REGISTRY_PATH = Path("./data/devices.json")
 _REGISTRY_PATH.parent.mkdir(parents=True, exist_ok=True)
 
+LEGACY_DEVICE_ID_MAP: Dict[str, str] = {
+    "bridge-esp32-001": "dev-sensor-002",
+    "esp32-test-01": "dev-sensor-001",
+    "sim-device-001": "dev-sensor-003",
+}
+
+
+def canonicalize_device_id(device_id: str) -> str:
+    return LEGACY_DEVICE_ID_MAP.get(device_id, device_id)
+
 @dataclass
 class DeviceRecord:
     device_id: str
@@ -30,6 +40,7 @@ def _save(state: Dict[str, DeviceRecord]) -> None:
         json.dump({k: asdict(v) for k, v in state.items()}, f, indent=2)
 
 def register(device_id: str, label: Optional[str] = None, notes: Optional[str] = None) -> DeviceRecord:
+    device_id = canonicalize_device_id(device_id)
     state = _load()
     rec = state.get(device_id) or DeviceRecord(device_id=device_id)
     if label is not None:
@@ -51,9 +62,10 @@ def all_devices() -> List[DeviceRecord]:
     return list(_load().values())
 
 def get(device_id: str) -> Optional[DeviceRecord]:
-    return _load().get(device_id)
+    return _load().get(canonicalize_device_id(device_id))
 
 def touch_last_seen(device_id: str, ts: Optional[datetime] = None) -> None:
+    device_id = canonicalize_device_id(device_id)
     state = _load()
     rec = state.get(device_id) or DeviceRecord(device_id=device_id)
     iso = (ts or datetime.now(timezone.utc)).isoformat()
@@ -62,6 +74,7 @@ def touch_last_seen(device_id: str, ts: Optional[datetime] = None) -> None:
     _save(state)
 
 def set_rate(device_id: str, rate_hz: int) -> DeviceRecord:
+    device_id = canonicalize_device_id(device_id)
     state = _load()
     rec = state.get(device_id) or DeviceRecord(device_id=device_id)
     rec.preferred_rate_hz = int(rate_hz)
@@ -70,6 +83,7 @@ def set_rate(device_id: str, rate_hz: int) -> DeviceRecord:
     return rec
 
 def set_batch(device_id: str, batch_size: int) -> DeviceRecord:
+    device_id = canonicalize_device_id(device_id)
     state = _load()
     rec = state.get(device_id) or DeviceRecord(device_id=device_id)
     rec.preferred_batch_size = int(batch_size)

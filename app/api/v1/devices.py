@@ -34,6 +34,7 @@ def _deviceout_from_cache(device_id: str, rec=None) -> DeviceOut:
     If a service `rec` is provided, prefer its `label` and `last_seen` values
     while still sourcing live telemetry fields from the MQTT cache.
     """
+    device_id = svc.canonicalize_device_id(device_id)
     with _cache_lock:
         c = _mqtt_status_cache.get(device_id)
 
@@ -69,6 +70,7 @@ def _on_status_msg(client, userdata, msg):
         return
     if not device_id:
         return
+    device_id = svc.canonicalize_device_id(device_id)
     with _cache_lock:
         _mqtt_status_cache[device_id] = {
             "state": payload.get("state", "unknown"),
@@ -97,11 +99,13 @@ _ensure_mqtt_started()
 
 def _merged_status(device_id: str, fallback: str) -> str:
     """Prefer live MQTT status if available; else your service's status string."""
+    device_id = svc.canonicalize_device_id(device_id)
     with _cache_lock:
         cached = _mqtt_status_cache.get(device_id)
     return (cached.get("state") if cached else None) or fallback or "unknown"
 
 def _cached_status_detail(device_id: str) -> Dict[str, Any]:
+    device_id = svc.canonicalize_device_id(device_id)
     with _cache_lock:
         cached = _mqtt_status_cache.get(device_id)
     if not cached:
@@ -139,19 +143,20 @@ async def list_devices() -> List[DeviceOut]:
     _ensure_mqtt_started()  # make sure cache is live
 
     out: List[DeviceOut] = []
-    registry = {rec.device_id: rec for rec in svc.all_devices()}
+    registry = {svc.canonicalize_device_id(rec.device_id): rec for rec in svc.all_devices()}
 
     # Include all known device ids from both registry and live MQTT cache.
     # This prevents cache-only devices (recently connected but not yet registered)
     # from disappearing in the UI table.
     with _cache_lock:
-        cache_ids = set(_mqtt_status_cache.keys())
+        cache_ids = {svc.canonicalize_device_id(k) for k in _mqtt_status_cache.keys()}
 
-    influx_ids = set(await read_recent_device_ids(range="24h"))
+    influx_ids = {svc.canonicalize_device_id(i) for i in await read_recent_device_ids(range="24h")}
 
     for device_id in sorted(set(registry.keys()).union(cache_ids).union(influx_ids)):
-        rec = registry.get(device_id)
-        out.append(_deviceout_from_cache(device_id, rec))
+        canonical_id = svc.canonicalize_device_id(device_id)
+        rec = registry.get(canonical_id)
+        out.append(_deviceout_from_cache(canonical_id, rec))
     out.sort(key=lambda d: d.device_id)
     return out
 
@@ -162,10 +167,11 @@ async def list_devices() -> List[DeviceOut]:
     dependencies=[Depends(deps.require_api_key_or_role("viewer"))],
 )
 async def get_device(device_id: str) -> DeviceOut:
-    rec = svc.get(device_id)
+    canonical_id = svc.canonicalize_device_id(device_id)
+    rec = svc.get(canonical_id)
     if not rec:
         raise HTTPException(status_code=404, detail="Device not found")
-    return _deviceout_from_cache(rec.device_id, rec)
+    return _deviceout_from_cache(canonical_id, rec)
 
 # ----------------------------
 # New: explicit live status endpoint for the UI
@@ -187,15 +193,16 @@ async def device_status(device_id: str) -> Dict[str, Any]:
     """
     # Touch MQTT init just in case
     _ensure_mqtt_started()
-    detail = _cached_status_detail(device_id)
+    canonical_id = svc.canonicalize_device_id(device_id)
+    detail = _cached_status_detail(canonical_id)
 
     # If not in cache but the device exists, derive a best-effort state
     if detail.get("state") == "unknown":
-        rec = svc.get(device_id)
+        rec = svc.get(canonical_id)
         if rec:
             detail["state"] = svc.status(rec)
     # Optionally add server-observed last_seen as convenience
-    rec = svc.get(device_id)
+    rec = svc.get(canonical_id)
     if rec:
         # Make this a string to keep JSON consistent
         try:
