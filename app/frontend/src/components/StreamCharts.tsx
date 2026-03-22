@@ -118,7 +118,7 @@ export function Sparkline({
 
   const tipLeft = Math.min(g.w - 130, Math.max(g.left + 8, cursorX + 8));
   const tipTop = Math.max(g.top + 4, cursorY - 38);
-  const scrubY = g.h - 16;
+  const scrubY = g.h - 22;
   const xDisplay =
     xValues && xValues[cursor] !== undefined
       ? (xValueFormatter ?? defaultXFormatter)(xValues[cursor])
@@ -205,7 +205,7 @@ export function MultiSparkline({
   };
 
   const cursorX = scaleX(cursor);
-  const scrubY = g.h - 16;
+  const scrubY = g.h - 22;
   const xDisplay =
     xValues && xValues[cursor] !== undefined
       ? (xValueFormatter ?? defaultXFormatter)(xValues[cursor])
@@ -294,7 +294,7 @@ export function SpectrumBars({
 
   const maxAmp = Math.max(...bins.map((b) => b.amplitude), 1e-9);
   const barW = (g.w - g.left - g.right) / bins.length;
-  const scrubY = g.h - 16;
+  const scrubY = g.h - 22;
 
   const onPointerMove = (event: React.PointerEvent<SVGSVGElement>) => {
     setCursor(pointerIndexFromEvent(event, bins.length));

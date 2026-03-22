@@ -237,27 +237,36 @@ export default function Streams() {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-[auto_1fr_auto_auto_auto] gap-2 lg:items-center">
-        <label className="text-sm self-center">Device ID</label>
-        <select value={device} onChange={(e) => setDevice(e.target.value)} className="border rounded px-2 py-1 min-w-0">
-          <option value={ALL_SENSORS_VALUE}>All Sensors</option>
-          {devices.length === 0 && (
-            <option value={device}>{device}</option>
-          )}
-          {devices.map((d) => (
-            <option key={d.device_id} value={d.device_id}>
-              {d.label ? `${d.label} (${d.device_id})` : d.device_id}
-            </option>
-          ))}
-        </select>
-        <label className="text-sm self-center">View</label>
-        <select value={viewMode} onChange={(e) => setViewMode(e.target.value as "time" | "frequency")} className="border rounded px-2 py-1 w-full sm:w-32">
-          <option value="time">Time</option>
-          <option value="frequency">Frequency</option>
-        </select>
-        <label className="text-sm self-center">Window (s)</label>
-        <input type="number" value={windowS} onChange={(e) => setWindowS(Number(e.target.value))} className="border rounded px-2 py-1 w-full sm:w-24" />
-        <button onClick={() => viewMode === "time" ? load(false) : loadSpectrum()} className="px-3 py-1 rounded bg-blue-600 text-white w-full sm:w-auto">Refresh</button>
+      <div className="flex flex-nowrap items-end gap-3 overflow-x-auto pb-1">
+        <div className="flex flex-col min-w-[280px] sm:min-w-[380px]">
+          <label className="text-sm mb-1">Device ID</label>
+          <select value={device} onChange={(e) => setDevice(e.target.value)} className="border rounded px-2 py-1 min-w-0">
+            <option value={ALL_SENSORS_VALUE}>All Sensors</option>
+            {devices.length === 0 && (
+              <option value={device}>{device}</option>
+            )}
+            {devices.map((d) => (
+              <option key={d.device_id} value={d.device_id}>
+                {d.label ? `${d.label} (${d.device_id})` : d.device_id}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        <div className="flex flex-col min-w-[120px]">
+          <label className="text-sm mb-1">View</label>
+          <select value={viewMode} onChange={(e) => setViewMode(e.target.value as "time" | "frequency")} className="border rounded px-2 py-1">
+            <option value="time">Time</option>
+            <option value="frequency">Frequency</option>
+          </select>
+        </div>
+
+        <div className="flex flex-col min-w-[110px]">
+          <label className="text-sm mb-1">Window (s)</label>
+          <input type="number" value={windowS} onChange={(e) => setWindowS(Number(e.target.value))} className="border rounded px-2 py-1" />
+        </div>
+
+        <button onClick={() => viewMode === "time" ? load(false) : loadSpectrum()} className="px-4 py-2 rounded bg-blue-600 text-white whitespace-nowrap">Refresh</button>
       </div>
 
       <div className="bg-white border rounded p-2 sm:p-3">
