@@ -1,69 +1,14 @@
 import { useEffect, useState } from "react";
 import { api } from "../api/client";
 import { useRef } from "react";
+import { MultiSparkline, Sparkline, type HeartbeatPoint, type StreamPoint } from "../components/StreamCharts";
 
-type Point = { t: string; x: number; y: number; z: number };
-type HeartbeatPoint = { t: string; rssi: number };
 const ALL_SENSORS_VALUE = "__all__";
-
-function Sparkline({ data, color }: { data: number[]; color: string }) {
-  const w = 600, h = 120, pad = 6;
-  if (!data || data.length === 0) return <div className="text-sm text-gray-500">No data</div>;
-  const min = Math.min(...data), max = Math.max(...data);
-  const scaleX = (i: number) => pad + (i / Math.max(1, data.length - 1)) * (w - pad * 2);
-  const scaleY = (v: number) => {
-    if (max === min) return h / 2;
-    return pad + (1 - (v - min) / (max - min)) * (h - pad * 2);
-  };
-  const d = data.map((v, i) => `${i === 0 ? 'M' : 'L'} ${scaleX(i)} ${scaleY(v)}`).join(' ');
-  return (
-    <svg viewBox={`0 0 ${w} ${h}`} width="100%" height="120">
-      <path d={d} fill="none" stroke={color} strokeWidth={2} strokeLinejoin="round" strokeLinecap="round" />
-    </svg>
-  );
-}
-
-function MultiSparkline({ series }: { series: { data: number[]; color: string; label?: string }[] }) {
-  const w = 600, h = 140, pad = 6;
-  if (!series || series.length === 0) return <div className="text-sm text-gray-500">No data</div>;
-  const lengths = series.map(s => s.data.length);
-  const maxLen = Math.max(...lengths, 1);
-  // Flatten values to compute global min/max
-  const values = series.flatMap(s => s.data);
-  if (values.length === 0) return <div className="text-sm text-gray-500">No data</div>;
-  const min = Math.min(...values), max = Math.max(...values);
-  const scaleX = (i: number) => pad + (i / Math.max(1, maxLen - 1)) * (w - pad * 2);
-  const scaleY = (v: number) => {
-    if (max === min) return h / 2;
-    return pad + (1 - (v - min) / (max - min)) * (h - pad * 2);
-  };
-
-  const paths = series.map(s => {
-    const d = s.data.map((v, i) => `${i === 0 ? 'M' : 'L'} ${scaleX(i)} ${scaleY(v)}`).join(' ');
-    return <path key={s.color} d={d} fill="none" stroke={s.color} strokeWidth={2} strokeLinejoin="round" strokeLinecap="round" />;
-  });
-
-  return (
-    <div>
-      <div className="flex items-center gap-3 text-sm text-gray-600 mb-1">
-        {series.map(s => (
-          <div key={s.color} className="flex items-center gap-2">
-            <span style={{ width: 12, height: 12, background: s.color, display: 'inline-block', borderRadius: 4 }} />
-            <span>{s.label ?? ''}</span>
-          </div>
-        ))}
-      </div>
-      <svg viewBox={`0 0 ${w} ${h}`} width="100%" height={h}>
-        {paths}
-      </svg>
-    </div>
-  );
-}
 
 export default function Streams() {
   const [device, setDevice] = useState<string>("");
   const [windowS, setWindowS] = useState<number>(60);
-  const [points, setPoints] = useState<Point[]>([]);
+  const [points, setPoints] = useState<StreamPoint[]>([]);
   const [heartbeatPoints, setHeartbeatPoints] = useState<HeartbeatPoint[]>([]);
   const [loading, setLoading] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
@@ -72,7 +17,7 @@ export default function Streams() {
   const [csvTo, setCsvTo] = useState<string>("");
   const [devices, setDevices] = useState<{ device_id: string; label?: string }[]>([]);
   // Live MQTT stream via backend WebSocket
-  const [livePoints, setLivePoints] = useState<Point[]>([]);
+  const [livePoints, setLivePoints] = useState<StreamPoint[]>([]);
   const [liveHeartbeat, setLiveHeartbeat] = useState<HeartbeatPoint | null>(null);
   const wsRef = useRef<WebSocket | null>(null);
 
@@ -96,7 +41,7 @@ export default function Streams() {
         try {
           const msg = JSON.parse(ev.data);
           if (msg.type === "data") {
-            const p: Point = { t: msg.ts, x: msg.x, y: msg.y, z: msg.z };
+            const p: StreamPoint = { t: msg.ts, x: msg.x, y: msg.y, z: msg.z };
             setLivePoints(prev => {
               const next = [...prev, p].slice(-200);
               return next;
