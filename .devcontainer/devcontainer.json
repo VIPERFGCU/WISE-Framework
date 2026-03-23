@@ -1,0 +1,26 @@
+{
+    "name": "PlatformIO ESP-IDF Dev",
+    "image": "mcr.microsoft.com/devcontainers/python:3.11",
+    "customizations": {
+        "vscode": {
+            "extensions": [
+                "platformio.platformio-ide",
+                "ms-vscode.cpptools"
+            ]
+        }
+    },
+    "features": {
+        "ghcr.io/devcontainers/features/common-utils:1": {
+            "configureZshAsDefaultShell": true
+        }
+    },
+    "remoteUser": "vscode",
+    "runArgs": [
+        "--privileged",
+        "--device=/dev/ttyUSB0:/dev/ttyUSB0" 
+    ],
+    "mounts": [
+        "source=/dev,target=/dev,type=bind"
+    ],
+    "postCreateCommand": "pip install -U platformio && pio platform install espressif32"
+}
