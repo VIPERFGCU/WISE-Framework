@@ -1,3 +1,5 @@
+#include "sdkconfig.h"
+#include <Arduino.h>
 #include <string.h>
 #include "esp_wifi.h"
 #include "esp_mac.h"
@@ -56,7 +58,7 @@ int8_t get_rssi() {
 
 // --- MQTT ---
 static void mqtt_event_handler(void *handler_args, esp_event_base_t base, int32_t event_id, void *event_data) {
-    esp_mqtt_event_handle_t event = event_data;
+    esp_mqtt_event_handle_t event = (esp_mqtt_event_handle_t)event_data;
     switch ((esp_mqtt_event_id_t)event_id) {
     case MQTT_EVENT_CONNECTED:
         ESP_LOGI(TAG, "[ROOT] MQTT Connected");
@@ -94,9 +96,10 @@ static void mqtt_event_handler(void *handler_args, esp_event_base_t base, int32_
 
 void start_mqtt() {
     if (mqtt_client != NULL) return; 
-    esp_mqtt_client_config_t mqtt_cfg = { .broker.address.uri = MQTT_BROKER_URL };
+    esp_mqtt_client_config_t mqtt_cfg = {};
+    mqtt_cfg.uri = MQTT_BROKER_URL;
     mqtt_client = esp_mqtt_client_init(&mqtt_cfg);
-    esp_mqtt_client_register_event(mqtt_client, ESP_EVENT_ANY_ID, mqtt_event_handler, NULL);
+    esp_mqtt_client_register_event(mqtt_client, MQTT_EVENT_ANY, mqtt_event_handler, NULL);
     esp_mqtt_client_start(mqtt_client);
     ESP_LOGI(TAG, "MQTT Client Started... Waiting for connection...");
 }
@@ -169,7 +172,7 @@ void mesh_p2p_rx_task(void *arg) {
     mesh_addr_t from;
     mesh_data_t data;
     int flag = 0;
-    data.data = heap_caps_malloc(1500, MALLOC_CAP_8BIT);    //Buffer size.
+    data.data = (uint8_t*)heap_caps_malloc(1500, MALLOC_CAP_8BIT);    //Buffer size.
     while (1) {
         data.size = 1500;
         // Listen for any packet.
@@ -340,28 +343,30 @@ void ota_task(void *pvParameter) {
     char *url = (char *)pvParameter;
     ESP_LOGI(TAG, "Starting OTA Download from: %s", url);
 
-    esp_http_client_config_t config = {
-        .url = url,
-        .cert_pem = NULL, // No SSL for local testing
-        .timeout_ms = 5000,
-        .keep_alive_enable = true,
-    };
+    // 1. Zero-initialize the struct to prevent all those compiler warnings
+    esp_http_client_config_t config = {}; 
+    
+    // 2. Assign the variables directly (Standard C++ style)
+    config.url = url;
+    config.cert_pem = NULL; // No SSL for local testing
+    config.timeout_ms = 5000;
+    config.keep_alive_enable = true;
 
-    esp_https_ota_config_t ota_config = {
-        .http_config = &config,
-    };
-
-    esp_err_t ret = esp_https_ota(&ota_config);
+    // 3. Pass the HTTP config DIRECTLY to the OTA function.
+    // Notice we completely removed the esp_https_ota_config_t wrapper.
+    esp_err_t ret = esp_https_ota(&config);
+    
     if (ret == ESP_OK) {
         ESP_LOGI(TAG, "OTA Update Successful! Rebooting...");
         esp_restart();
     } else {
         ESP_LOGE(TAG, "OTA Update Failed! Error: %d", ret);
     }
+    
     vTaskDelete(NULL);
 }
 
-void app_main(void) {
+void setup(void) {
     // NVS Init
     esp_err_t ret = nvs_flash_init();
     if (ret == ESP_ERR_NVS_NO_FREE_PAGES || ret == ESP_ERR_NVS_NEW_VERSION_FOUND) {
@@ -418,3 +423,5 @@ void app_main(void) {
 
     xTaskCreate(data_task, "data_task", 3072, NULL, 5, NULL);
 }
+
+void loop() {};

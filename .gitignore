@@ -2,5 +2,7 @@
 *.pyc
 *.elf
 *.a
-firmware/.pio/build
-
+firmware/.pio
+firmware/sdkconfig.esp32-s3-devkitc-1
+firmware/sdkconfig.esp32dev
+firmware/sdkconfig.esp32dev.old
