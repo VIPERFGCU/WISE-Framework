@@ -1,3 +1,6 @@
+# Yeah...I'll get to this
+# Everything below does not apply.
+Just reopen in dev container in vscode.
 
 # FastAPI Backend (Docker, InfluxDB, Mosquitto)
 
