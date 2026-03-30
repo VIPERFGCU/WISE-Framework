@@ -1,16 +1,14 @@
 #include "Arduino.h"
 #include <WiFi.h>
 #include <WiFiUdp.h>
+
 #include "ntp_client.h"
 #include "Accelerometer.h"
 #include "mqtt_client.h"
 #include "ntp_sensor_node.h"
+#include "ntp_mesh.h"
 
-// ================== WIFI CONFIGURATION ===================
-const char* ssid = "pop-os";
-const char* password = "adminnnn";
-// ======================================================================
-const int MS_INTERVAL = 10; // 10ms per record
+extern const int MS_INTERVAL = 10; // 10ms per record
 
 hw_timer_t * timer = NULL;
 
@@ -56,15 +54,13 @@ void mqttTask(void * parameter) {
   }
 }
 
-void setup(){
-  Serial.begin(115200);
+void ntp_sensor_node_init(){
 
-  WiFi.begin(ssid, password);
-
-  while ( WiFi.status() != WL_CONNECTED ) {
-    delay ( 500 );
-    Serial.print ( "." );
-  }
+  // Guard incase of recalling( Mesh accidently disconnects )
+  static bool is_initialized = false;
+  if (is_initialized) return; 
+  is_initialized = true;
+  // End guard
 
   ntp_setup();
   init_accelerometer();
@@ -80,26 +76,10 @@ void setup(){
     &dataRecorderTask,// Task handle
     0);             // Core where the task should run (0)
 
-  // timer = timerBegin(1000000);  // 1Mhz
-  // timerAttachInterrupt(timer, &onTimer);
-  // timerAlarm(timer, MS_INTERVAL * 1000, true, 0);
-  // timerStart(timer);
-
-  // 1. timerBegin(timer_id, prescaler, countUp)
-  // The ESP32 base clock is 80MHz. A prescaler of 80 divides it down to 1MHz (1 tick = 1us).
-  // We'll use Timer 0.
+  
   timer = timerBegin(0, 80, true); 
-
-  // 2. timerAttachInterrupt(timer, function, edge)
-  // The 'true' at the end means it triggers on the edge of the signal.
   timerAttachInterrupt(timer, &onTimer, true);
-
-  // 3. timerAlarmWrite(timer, alarm_value, autoreload)
-  // This replaces the first half of your timerAlarm() function.
   timerAlarmWrite(timer, MS_INTERVAL * 1000, true);
-
-  // 4. timerAlarmEnable(timer)
-  // You have to explicitly start the alarm in v2.
   timerAlarmEnable(timer);
 
   Serial.println("Setup Complete");

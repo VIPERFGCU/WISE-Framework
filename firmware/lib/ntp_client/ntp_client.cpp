@@ -3,9 +3,13 @@
 #include <WiFi.h>
 #include <WiFiUdp.h>
 #include "time.h"
+#include "freertos/FreeRTOS.h"
+#include "freertos/task.h"
+#include "esp_mesh.h"
 
 // Headers
 time_t getNtpTime(IPAddress& ntpServer);
+time_t getMeshTime();
 uint64_t getEpochTime();
 void ntp_setup();
 
@@ -17,8 +21,6 @@ const int PPS_PIN = 27; // V2 - A Wroom
 const int NTP_PORT = 123;
 const int NTP_PACKET_SIZE = 48;
 byte packetBuffer[NTP_PACKET_SIZE];
-//IPAddress ntpServer(192,168,0,2); // The esp32 ntp server
-//IPAddress ntpServer(129, 6, 15, 26); // nist ntp server. time.google.com has blocked me as well as nist servers: 129.6.15.28 and 129.6.15.29
 IPAddress ntpServer(10,100,100,1);  // Local ntp server( on linux )
 // =========================
 // ====TIME SETTINGS=====
@@ -56,7 +58,7 @@ void IRAM_ATTR onPPS() {
   portEXIT_CRITICAL_ISR(&timerMux);
 }
 
-void init_time_task() {
+void init_time_task(void *pvParameters) {
   while (currentTime == 0) {
     Serial.println("Waiting for PPS pulse to align NTP request...");
 
@@ -65,7 +67,7 @@ void init_time_task() {
     ppsFlag = false;
     portEXIT_CRITICAL(&timerMux);
 
-    bool ppsSeen = false; // FIXED: Initialize to false so the loop actually runs
+    bool ppsSeen = false;
     while (!ppsSeen) {
       portENTER_CRITICAL(&timerMux);
       ppsSeen = ppsFlag;
@@ -78,9 +80,16 @@ void init_time_task() {
     uint32_t syncPpsMicros = lastPpsMicros;
     portEXIT_CRITICAL(&timerMux);
 
-    // 2. Fetch NTP immediately AFTER the pulse. 
-    // We now have almost a full second of buffer time before the next pulse hits.
-    time_t now = getNtpTime(ntpServer);
+    // Fetch NTP immediately AFTER the pulse. 
+    time_t now = 0;
+    
+    if (esp_mesh_is_root()) {
+      // Root node fetches time from the external NTP server
+      now = getNtpTime(ntpServer);
+    } else {
+      // Child nodes fetch time from the root via the mesh network
+      now = getMeshTime();
+    }
 
     if (now == 0) {
       Serial.println("No NTP response, retrying...");
@@ -108,6 +117,7 @@ void init_time_task() {
   }
   
   Serial.println("init_time_task done, deleting task.");
+  vTaskDelete(NULL);
 }
 
 
@@ -117,7 +127,7 @@ void ntp_setup() {
   attachInterrupt(digitalPinToInterrupt(PPS_PIN), onPPS, RISING);
   
   // Create init_time task
-  init_time_task();
+  xTaskCreate(init_time_task, "init_time", 4096, NULL, 5, NULL);
 }
 
 // ========================= NTP CLIENT =================

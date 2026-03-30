@@ -17,6 +17,9 @@
 #include "esp_ota_ops.h"
 #include "esp_netif.h"
 #include "esp_crt_bundle.h"
+
+#include "ntp_sensor_node.h"
+
 void ota_task(void *pvParameter);
 void broadcast_ota_to_mesh(void *arg);
 
@@ -38,7 +41,7 @@ static const char *TAG = "mesh_main";
 static bool is_root = false;
 static bool mqtt_connected = false;
 static esp_mqtt_client_handle_t mqtt_client = NULL;
-static char device_id[32]; 
+char device_id[32]; 
 static uint32_t packet_counter = 0; 
 
 void setup_device_id() {
@@ -121,22 +124,6 @@ void send_mesh_packet(const char *json_payload) {
 }
 
 // --- TASKS ---
-void data_task(void *arg) {
-    char payload[256];
-    while (1) {
-        vTaskDelay(pdMS_TO_TICKS(5000)); // Slow down to 5s for debugging
-        packet_counter++;
-        snprintf(payload, sizeof(payload), 
-                 "{\"id\":\"%s\",\"v\":2,\"type\":\"data\",\"msg_id\":%lu,\"val\":[%.2f,%.2f,%.2f]}", //need to fix this 'v' to be dynamically changed per firmware version.
-                 device_id, (unsigned long)packet_counter,
-                 (float)(esp_random() % 100) / 10.0,
-                 (float)(esp_random() % 100) / 10.0,
-                 (float)(esp_random() % 100) / 10.0);
-        send_mesh_packet(payload);
-    }
-}
-
-
 //Theoretical Implementation for receiver logic
 void mesh_ota_receiver_logic(uint8_t *incoming_data, size_t len) {
     mesh_ota_packet_t *packet = (mesh_ota_packet_t *)incoming_data;
@@ -186,6 +173,18 @@ void mesh_p2p_rx_task(void *arg) {
                 //Pass to helper function
                 mesh_ota_receiver_logic(data.data, data.size);
             }
+            // ==== TIME SYNC( Yeah I could use a Semaphore but I can't be bothered to touch this code. ) ====
+            else if (packet_type == MESH_PACKET_TIME_REQ && is_root) {
+                // Root intercepts a time request from a child
+                handle_mesh_time_request(&from);
+            }
+            else if (packet_type == MESH_PACKET_TIME_RES && !is_root) {
+                // Child intercepts the time response it was waiting for
+                mesh_time_res_t *res = (mesh_time_res_t *)data.data;
+                received_mesh_time = res->current_time; // This unblocks getMeshTime()
+                ESP_LOGI(TAG, "Node received mesh time: %ld", received_mesh_time);
+            }
+            // ---- TIME SYNC END ----
             else {
                 // Sensor Data, forward to MQTT
                             data.data[data.size] = 0;
@@ -239,6 +238,8 @@ void mesh_event_handler(void *arg, esp_event_base_t event_base, int32_t event_id
             ESP_LOGI(TAG, ">>> I AM NODE <<<");
             xTaskCreate(mesh_p2p_rx_task, "p2p_rx", 3072, NULL, 5, NULL);
         }
+        
+        ntp_sensor_node_init();
         break;
     case MESH_EVENT_PARENT_DISCONNECTED:
         if (is_root) { 
@@ -420,8 +421,6 @@ void setup(void) {
     //OTA Test (Uncomment and build new firmware to send to root for OTA.)
     ESP_LOGI(TAG, "DEVICE ID: %s (v2.0 OTA SUCCESS)", device_id);
     //ESP_LOGI(TAG, "DEVICE ID: %s (v1.0)", device_id);
-
-    xTaskCreate(data_task, "data_task", 3072, NULL, 5, NULL);
 }
 
 void loop() {};
