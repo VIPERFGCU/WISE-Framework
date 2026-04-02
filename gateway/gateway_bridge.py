@@ -4,7 +4,10 @@ import time
 from datetime import datetime, timezone
 
 # --- CONFIG ---
-CLOUD_BROKER_HOST = "192.168.1.79" 
+# CLOUD_BROKER_HOST = "34.70.15.187" 
+
+# Dev Env IP.
+CLOUD_BROKER_HOST = "10.42.0.59"
 CLOUD_BROKER_PORT = 1883
 
 # Backend Topic Schema
@@ -13,14 +16,20 @@ TOPIC_STATUS = "devices/{}/status"
 TOPIC_CONTROL_SUB = "devices/+/control"
 
 # Local Mesh Settings
-LOCAL_BROKER_HOST = "localhost"
+LOCAL_BROKER_HOST = "10.42.0.1" #Match MESH Hotsport.
 LOCAL_BROKER_PORT = 1883
-LOCAL_MESH_IN_TOPIC  = "mesh/#" # Listen for everything from mesh --- Do I need to refine this?
+LOCAL_MESH_IN_TOPIC  = "mesh/#" 
 LOCAL_OTA_CMD_TOPIC  = "mesh/ota/command"
 
 cloud_client = mqtt.Client(mqtt.CallbackAPIVersion.VERSION2, "Pi_Gateway_Cloud")
 local_client = mqtt.Client(mqtt.CallbackAPIVersion.VERSION2, "Pi_Gateway_Local")
 
+def on_local_connect(client, userdata, flags, rc, props):
+    print(f"[LOCAL] Connected to broker with result code: {rc}")
+    client.subscribe(LOCAL_MESH_IN_TOPIC)
+    print(f"[LOCAL] Subscribed to {LOCAL_MESH_IN_TOPIC}")
+    
+    
 def on_local_message(client, userdata, msg):
     """
     Received packet from Mesh.
@@ -80,7 +89,7 @@ def on_cloud_message(client, userdata, msg):
             
             # 2. If no URL, build a default one (Safe Fallback)
             if not ota_url:
-                target_ip = cmd.get("ip", "10.10.10.1") # Default to Mesh Gateway IP
+                target_ip = cmd.get("ip", "10.42.0.1") # Default to Mesh Gateway IP
                 filename = cmd.get("file", "update.bin")
                 ota_url = f"http://{target_ip}:8000/{filename}"
             
@@ -94,9 +103,9 @@ def on_cloud_message(client, userdata, msg):
         pass
 
 # Setup & Loop
+local_client.on_connect = on_local_connect
 local_client.on_message = on_local_message
 local_client.connect(LOCAL_BROKER_HOST, LOCAL_BROKER_PORT, 60)
-local_client.subscribe(LOCAL_MESH_IN_TOPIC)
 local_client.loop_start()
 
 cloud_client.on_connect = on_cloud_connect

@@ -19,7 +19,7 @@ void ota_task(void *pvParameter);
 void broadcast_ota_to_mesh(void *arg);
 
 // --- CONFIG ---
-#define PI_IP_ADDRESS "10.10.10.1"
+#define PI_IP_ADDRESS "10.42.0.1"
 #define MQTT_BROKER_URL "mqtt://" PI_IP_ADDRESS ":1883"
 
 // --- OTA Packet Def ---
@@ -76,11 +76,19 @@ static void mqtt_event_handler(void *handler_args, esp_event_base_t base, int32_
             // Start the Download Task
             xTaskCreate(ota_task, "ota_task", 8192, strdup(url), 5, NULL);
         }
-        // Check for PROPAGATE Command for Child sensors.
+            // Check for PROPAGATE Command for Child sensors.
         else if (strncmp(event->topic, "mesh/ota/propagate", event->topic_len) == 0) {
-            ESP_LOGW(TAG, "[OTA] Received Propagate Command! Starting Mesh Broadcast...");
-            // Running as a task to avoid blocking the MQTT handler
-            xTaskCreate(broadcast_ota_to_mesh, "mesh_broadcast", 8192, NULL, 5, NULL);
+            char size_str[32] = {0};
+            snprintf(size_str, event->data_len + 1, "%.*s", event->data_len, event->data);
+            uint32_t fw_size = (uint32_t)atoi(size_str);
+            
+            if (fw_size == 0) {
+                ESP_LOGE(TAG, "ERROR: Propagate command MUST include exact file size!");
+                return;
+            }
+            
+            ESP_LOGW(TAG, "[OTA] Received Propagate Command! Exact Size: %lu", fw_size);
+            xTaskCreate(broadcast_ota_to_mesh, "mesh_broadcast", 8192, (void*)fw_size, 5, NULL);
         }
         break;
         
@@ -124,7 +132,7 @@ void data_task(void *arg) {
         vTaskDelay(pdMS_TO_TICKS(5000)); // Slow down to 5s for debugging
         packet_counter++;
         snprintf(payload, sizeof(payload), 
-                 "{\"id\":\"%s\",\"v\":2,\"type\":\"data\",\"msg_id\":%lu,\"val\":[%.2f,%.2f,%.2f]}", //need to fix this 'v' to be dynamically changed per firmware version.
+                 "{\"id\":\"%s\",\"v\":\"2.0.9\",\"type\":\"data\",\"msg_id\":%lu,\"val\":[%.2f,%.2f,%.2f]}", //need to fix this 'v' to be dynamically changed per firmware version.
                  device_id, (unsigned long)packet_counter,
                  (float)(esp_random() % 100) / 10.0,
                  (float)(esp_random() % 100) / 10.0,
@@ -199,6 +207,20 @@ void mesh_p2p_rx_task(void *arg) {
 
 }
 
+
+// --- IP EVENT HANDLER ---
+// --- IP EVENT HANDLER ---
+void ip_event_handler(void *arg, esp_event_base_t event_base, int32_t event_id, void *event_data) {
+    if (event_id == IP_EVENT_STA_GOT_IP) {
+        ip_event_got_ip_t *event = (ip_event_got_ip_t *) event_data;
+        ESP_LOGI(TAG, ">>> ROOT GOT IP: " IPSTR " <<<", IP2STR(&event->ip_info.ip));
+        
+        // Start MQTT
+        if (is_root) {
+            start_mqtt();
+        }
+    }
+}
 // --- MESH EVENT HANDLER ---
 void mesh_event_handler(void *arg, esp_event_base_t event_base, int32_t event_id, void *event_data) {
     switch (event_id) {
@@ -210,25 +232,14 @@ void mesh_event_handler(void *arg, esp_event_base_t event_base, int32_t event_id
             ESP_LOGI(TAG, ">>> I AM ROOT <<<");
             is_root = true;
 
-            // --- FORCE STATIC IP LOGIC ---
+            // ESP-Mesh disables DHCP by default. Explicitly start for root.
             esp_netif_t *netif = esp_netif_get_handle_from_ifkey("WIFI_STA_DEF");
             if (netif) {
-                ESP_LOGW(TAG, "Found Interface! Stopping DHCP and Forcing IP...");
-                esp_netif_dhcpc_stop(netif);
-                
-                esp_netif_ip_info_t ip_info;
-                IP4_ADDR(&ip_info.ip, 10, 10, 10, 5);      // FORCE IP: 10.10.10.5
-                IP4_ADDR(&ip_info.gw, 10, 10, 10, 1);      // GATEWAY: 10.10.10.1
-                IP4_ADDR(&ip_info.netmask, 255, 255, 255, 0);
-                
-                esp_netif_set_ip_info(netif, &ip_info);
-                ESP_LOGI(TAG, "Static IP Set to 10.10.10.5. Starting MQTT...");
-                
-                start_mqtt();
+                esp_netif_dhcpc_start(netif);
+                ESP_LOGI(TAG, "Requested DHCP IP from Pi WIFI Hotspot...");
             } else {
-                ESP_LOGE(TAG, "COULD NOT FIND WIFI INTERFACE HANDLE!");
+                ESP_LOGE(TAG, "Could not find WIFI interface!");
             }
-            // -----------------------------
 
             xTaskCreate(mesh_p2p_rx_task, "p2p_rx", 3072, NULL, 5, NULL);
         } else {
@@ -250,8 +261,8 @@ void mesh_event_handler(void *arg, esp_event_base_t event_base, int32_t event_id
 }
 
 
-// Theoretical Root Broadcaster Implementation
 void broadcast_ota_to_mesh(void *arg) {
+    uint32_t exact_fw_size = (uint32_t)arg;
     char debug_msg[128];
 
     // 1. Notify MQTT we are starting
@@ -260,13 +271,11 @@ void broadcast_ota_to_mesh(void *arg) {
 
     // 2. Get Routing Table
     int route_table_size = esp_mesh_get_routing_table_size();
-    
-    // DEBUG: Tell us how many nodes are found
     snprintf(debug_msg, sizeof(debug_msg), "LOG: Routing Table Size: %d", route_table_size);
     esp_mqtt_client_publish(mqtt_client, "mesh/debug", debug_msg, 0, 0, 0);
 
     if (route_table_size < 1) {
-        esp_mqtt_client_publish(mqtt_client, "mesh/debug", "ERROR: No children found! Aborting.", 0, 0, 0);
+        esp_mqtt_client_publish(mqtt_client, "mesh/debug", "ERROR: No children found!", 0, 0, 0);
         vTaskDelete(NULL);
         return;
     }
@@ -274,18 +283,19 @@ void broadcast_ota_to_mesh(void *arg) {
     mesh_addr_t *route_table = (mesh_addr_t *)malloc(route_table_size * sizeof(mesh_addr_t));
     ESP_ERROR_CHECK(esp_mesh_get_routing_table(route_table, route_table_size * sizeof(mesh_addr_t), &route_table_size));
 
-    // 3. Prepare Payload
     const esp_partition_t *update_partition = esp_ota_get_running_partition();
     if (!update_partition) {
-         esp_mqtt_client_publish(mqtt_client, "mesh/debug", "ERROR: Could not find partition!", 0, 0, 0);
          vTaskDelete(NULL);
          return;
     }
 
     mesh_ota_packet_t packet;
     packet.type = 1; // OTA START
-    packet.total_size = update_partition->size;
+    packet.total_size = exact_fw_size; // Passing exact size for logging
     packet.offset = 0;
+
+    uint8_t my_mac[6];
+    esp_read_mac(my_mac, ESP_MAC_WIFI_STA);
 
     mesh_data_t mesh_data = {
         .data = (uint8_t *)&packet,
@@ -296,37 +306,48 @@ void broadcast_ota_to_mesh(void *arg) {
 
     // 4. Send START Command
     esp_mqtt_client_publish(mqtt_client, "mesh/debug", "LOG: Sending Start Packet...", 0, 0, 0);
-    
     for (int i = 0; i < route_table_size; i++) {
+        if (memcmp(route_table[i].addr, my_mac, 6) == 0) continue; 
         esp_mesh_send(&route_table[i], &mesh_data, MESH_DATA_P2P, NULL, 0);
     }
-    vTaskDelay(pdMS_TO_TICKS(2000)); 
+    vTaskDelay(pdMS_TO_TICKS(3000)); 
 
-    // 5. Send CHUNKS
+    // 5. Send CHUNKS (Slow & Steady, No Retries)
     uint32_t offset = 0;
     packet.type = 2; // OTA CHUNK
-    
-    // Notify MQTT we are entering the loop
     esp_mqtt_client_publish(mqtt_client, "mesh/debug", "LOG: Sending Data Chunks...", 0, 0, 0);
 
-    while (offset < update_partition->size) {
-        esp_partition_read(update_partition, offset, packet.data, OTA_CHUNK_SIZE);
+    while (offset < exact_fw_size) {
+        uint32_t chunk_len = OTA_CHUNK_SIZE;
+        
+        if (offset + OTA_CHUNK_SIZE > exact_fw_size) {
+            chunk_len = exact_fw_size - offset; 
+        }
+
+        esp_partition_read(update_partition, offset, packet.data, chunk_len);
+        
         packet.offset = offset;
-        packet.data_len = OTA_CHUNK_SIZE;
-        mesh_data.size = sizeof(mesh_ota_packet_t);
+        packet.data_len = chunk_len; 
+        mesh_data.size = sizeof(mesh_ota_packet_t); 
 
         for (int i = 0; i < route_table_size; i++) {
+            if (memcmp(route_table[i].addr, my_mac, 6) == 0) continue;
+            
+            // Send EXACTLY once. Rely on MAC-layer reliability.
             esp_mesh_send(&route_table[i], &mesh_data, MESH_DATA_P2P, NULL, 0);
         }
         
-        offset += OTA_CHUNK_SIZE;
-        vTaskDelay(pdMS_TO_TICKS(50)); 
+        offset += chunk_len;
+        
+        // 400ms throttle. Ensures Child flash memory never falls behind.
+        vTaskDelay(pdMS_TO_TICKS(400)); 
     }
 
     // 6. Send END Command
     packet.type = 3; // OTA END
     mesh_data.size = sizeof(packet);
     for (int i = 0; i < route_table_size; i++) {
+        if (memcmp(route_table[i].addr, my_mac, 6) == 0) continue;
         esp_mesh_send(&route_table[i], &mesh_data, MESH_DATA_P2P, NULL, 0);
     }
 
@@ -373,7 +394,7 @@ void app_main(void) {
     ESP_ERROR_CHECK(esp_netif_init());
     ESP_ERROR_CHECK(esp_event_loop_create_default());
     
-    // Creating the interfaces so "WIFI_STA_DEF" exists
+    // Creating the interfaiio so "WIFI_STA_DEF" exists
     esp_netif_t *netif_sta = NULL;
     esp_netif_t *netif_ap = NULL;
     ESP_ERROR_CHECK(esp_netif_create_default_wifi_mesh_netifs(&netif_sta, &netif_ap));
@@ -390,6 +411,7 @@ void app_main(void) {
     // Mesh Init
     ESP_ERROR_CHECK(esp_mesh_init());
     ESP_ERROR_CHECK(esp_event_handler_register(MESH_EVENT, ESP_EVENT_ANY_ID, &mesh_event_handler, NULL));
+    ESP_ERROR_CHECK(esp_event_handler_register(IP_EVENT, IP_EVENT_STA_GOT_IP, &ip_event_handler, NULL));    // Listen for DHCP Assignment
 
     // Mesh Configuration
     mesh_cfg_t cfg = MESH_INIT_CONFIG_DEFAULT();
@@ -413,8 +435,8 @@ void app_main(void) {
     ESP_LOGI(TAG, "Mesh started successfully, waiting for root...");
 
     //OTA Test (Uncomment and build new firmware to send to root for OTA.)
-    ESP_LOGI(TAG, "DEVICE ID: %s (v2.0 OTA SUCCESS)", device_id);
-    //ESP_LOGI(TAG, "DEVICE ID: %s (v1.0)", device_id);
+    ESP_LOGI(TAG, "DEVICE ID: %s (v2.0.9 OTA SUCCESS)", device_id);
+    //ESP_LOGI(TAG, "DEVICE ID: %s (v2.0.4)", device_id);
 
     xTaskCreate(data_task, "data_task", 3072, NULL, 5, NULL);
 }
