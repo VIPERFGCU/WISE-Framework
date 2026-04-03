@@ -1,0 +1,13 @@
+.venv
+*.log
+*.db
+
+.pio
+.vscode
+CMakeFiles
+CMakeCache.txt
+
+*.o
+*.pyc
+*.elf
+*.a

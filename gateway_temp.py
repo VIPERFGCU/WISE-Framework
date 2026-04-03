@@ -39,6 +39,8 @@ mac_to_id_map = {}  # Dictionary to store MAC -> Assigned ID mappings
 
 upload_timing = {}
 
+upload_timing = {}
+
 def on_local_message(client, userdata, msg):
     """
     Received packet from Mesh.
@@ -59,7 +61,11 @@ def on_local_message(client, userdata, msg):
             base_ts_us = int(raw.get("t_start", 0)) * 1000 
             interval_us = int(raw.get("interval", 0)) * 1_000_000
 
+<<<<<<< HEAD
             # --- TIMING ADJUSTMENT LOGIC ---
+=======
+                        # --- TIMING ADJUSTMENT LOGIC ---
+>>>>>>> 6e0192f4aafbea640eb2917f7e7f000450196013
             if device_id in upload_timing:
                 expected_base_ts = upload_timing[device_id]
                 
