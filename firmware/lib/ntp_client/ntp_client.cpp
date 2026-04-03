@@ -16,7 +16,8 @@ void ntp_setup();
 // ========= NTP ===========
 WiFiUDP udp;
 //const int PPS_PIN = 4;  // WROOM
-const int PPS_PIN = 27; // V2 - A Wroom
+// const int PPS_PIN = 27; // V2 - A Wroom
+const inst PPS_PIN = 11;  // s3
 //const int PPS_PIN = 7 // unexpected maker v2
 const int NTP_PORT = 123;
 const int NTP_PACKET_SIZE = 48;
