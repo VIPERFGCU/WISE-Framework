@@ -16,7 +16,12 @@ influx_client = InfluxDBClient(url=INFLUX_URL, token=INFLUX_TOKEN, org=INFLUX_OR
 write_api = influx_client.write_api(write_options=ASYNCHRONOUS)
 
 # --- CONFIG ---
-CLOUD_BROKER_HOST = "wise-net.io" 
+# CLOUD_BROKER_HOST = "34.70.15.187" 
+
+# Dev Env IP.
+CLOUD_BROKER_HOST = "10.42.0.59"
+
+# CLOUD_BROKER_HOST = "wise-net.io" 
 CLOUD_BROKER_PORT = 1883
 
 # Backend Topic Schema
@@ -25,9 +30,9 @@ TOPIC_STATUS = "devices/{}/status"
 TOPIC_CONTROL_SUB = "devices/+/control"
 
 # Local Mesh Settings
-LOCAL_BROKER_HOST = "localhost"
+LOCAL_BROKER_HOST = "10.42.0.1" #Match MESH Hotsport.
 LOCAL_BROKER_PORT = 1883
-LOCAL_MESH_IN_TOPIC  = "mesh/#" # Listen for everything from mesh --- Do I need to refine this?
+LOCAL_MESH_IN_TOPIC  = "mesh/#" 
 LOCAL_OTA_CMD_TOPIC  = "mesh/ota/command"
 LOCAL_MESH_OUT_TOPIC = "mesh/{}/command"
 
@@ -40,6 +45,13 @@ mac_to_id_map = {}  # Dictionary to store MAC -> Assigned ID mappings
 upload_timing = {}
 
 upload_timing = {}
+
+def on_local_connect(client, userdata, flags, rc, props):
+    print(f"[LOCAL] Connected to broker with result code: {rc}")
+    client.subscribe(LOCAL_MESH_IN_TOPIC)
+    print(f"[LOCAL] Subscribed to {LOCAL_MESH_IN_TOPIC}")
+    
+    
 
 def on_local_message(client, userdata, msg):
     """
@@ -130,7 +142,9 @@ def on_local_message(client, userdata, msg):
 
             # Publishing to Cloud Data Topic
             local_client.publish(LOCAL_MESH_OUT_TOPIC.format(device_id), json.dumps(out))
-            cloud_client.publish("mesh/", json.dumps(server_out))
+            cloud_client.publish(TOPIC_DATA.format(device_id), json.dumps(out))
+            print(f"[DATA] Forwarded for {device_id}")
+
 
         # HEARTBEAT Packet Handling (For now plug in later)
         elif msg_type == "heartbeat":
@@ -145,7 +159,8 @@ def on_local_message(client, userdata, msg):
             print(f"[HEARTBEAT] Forwarded for {device_id}")
 
     except Exception as e:
-        print(f"Error processing message: {e}")
+        print(f"Error: {e}")
+
 
 def on_cloud_connect(client, userdata, flags, rc, props):
     print(f"Cloud Connected: {rc}")
@@ -159,16 +174,28 @@ def on_cloud_message(client, userdata, msg):
     # Check if payload contains OTA command
     try:
         cmd = json.loads(msg.payload.decode())
+           # Check for OTA Command
         if cmd.get("cmd") == "OTA":
-            # Command Root Node to start OTA
-            # URL of file on pi
-            ota_url = f"http://{cmd.get('ip', '10.0.0.194')}:8000/fgcu-esp32.bin"
+            # 1. Try to get the full URL from the payload
+            ota_url = cmd.get("url")
+            
+            # 2. If no URL, build a default one (Safe Fallback)
+            if not ota_url:
+                target_ip = cmd.get("ip", "10.42.0.1") # Default to Mesh Gateway IP
+                filename = cmd.get("file", "update.bin")
+                ota_url = f"http://{target_ip}:8000/{filename}"
+            
+            # 3. Publish to Mesh
             local_client.publish(LOCAL_OTA_CMD_TOPIC, ota_url)
             print(f"[OTA] Triggered Root Update: {ota_url}")
+            
+    except Exception as e:
+        print(f"[ERROR] Failed to process cloud command: {e}")
     except:
         pass
 
 # Setup & Loop
+local_client.on_connect = on_local_connect
 local_client.on_message = on_local_message
 local_client.connect(LOCAL_BROKER_HOST, LOCAL_BROKER_PORT, 60)
 local_client.subscribe(LOCAL_MESH_IN_TOPIC)
