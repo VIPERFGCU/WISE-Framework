@@ -35,6 +35,9 @@ cloud_client = mqtt.Client(mqtt.CallbackAPIVersion.VERSION2, "Pi_Gateway_Cloud")
 local_client = mqtt.Client(mqtt.CallbackAPIVersion.VERSION2, "Pi_Gateway_Local")
 
 device_id_cnt = 0   # A straight counter for every new device
+mac_to_id_map = {}  # Dictionary to store MAC -> Assigned ID mappings
+
+upload_timing = {}
 
 def on_local_message(client, userdata, msg):
     """
@@ -45,7 +48,7 @@ def on_local_message(client, userdata, msg):
     
     try:
         raw = json.loads(msg.payload.decode())
-        device_id = raw.get("id", "unknown")
+        device_id = raw.get("id", "unknown") # Expected to be MAC address during assignment
         msg_type = raw.get("type", "data")
         
         # Packet Handling
@@ -55,6 +58,22 @@ def on_local_message(client, userdata, msg):
 
             base_ts_us = int(raw.get("t_start", 0)) * 1000 
             interval_us = int(raw.get("interval", 0)) * 1_000_000
+
+            # --- TIMING ADJUSTMENT LOGIC ---
+            if device_id in upload_timing:
+                expected_base_ts = upload_timing[device_id]
+                
+                # Check the difference between reported time and expected time
+                drift = abs(base_ts_us - expected_base_ts)
+                
+                # If the drift is within 3 intervals, it's just network/processing jitter. 
+                # Snap it to the expected timestamp to maintain perfect continuity.
+                if drift < (interval_us * 3):
+                    base_ts_us = expected_base_ts
+                else:
+                    print(f"[WARN] {device_id}: Large time gap/drift detected. Resetting baseline.")
+            
+            # -------------------------------
 
             points_buffer = []
 
@@ -71,33 +90,45 @@ def on_local_message(client, userdata, msg):
                     .time(current_ts, WritePrecision.NS)
                 
                 points_buffer.append(p)
+                                        
+            # Update expected next timestamp for the next batch from this device
+            upload_timing[device_id] = base_ts_us + (len(vals) * interval_us)
+
             # Bulk write to InfluxDB
-            if len(points_buffer) > 1:
+            if len(points_buffer) > 0:
                 write_api.write(bucket=INFLUX_BUCKET, org=INFLUX_ORG, record=points_buffer)
                 print(f"[DATA] Wrote {len(points_buffer)} records for {device_id}")
 
-
         elif msg_type == "client_assignment":
             # First request from every newly connected client device
-            # By default the device id will be the device's MAC address
-            device_id_cnt += 1
-            new_device_id = device_id_cnt
+            # device_id is expected to be the device's MAC address here
+            
+            if device_id in mac_to_id_map:
+                # We already know this device, fetch its existing ID
+                assigned_id = mac_to_id_map[device_id]
+                print(f"[REGISTER] Device MAC {device_id} reconnected. Sending existing ID {assigned_id}")
+            else:
+                # Brand new device, increment counter and save to map
+                device_id_cnt += 1
+                assigned_id = device_id_cnt
+                mac_to_id_map[device_id] = assigned_id
+                print(f"[REGISTER] New device registered. MAC: {device_id} -> ID: {assigned_id}")
+
             out = {
                 "device_id": device_id,
                 "type" : "set_id",
-                "payload" : str(new_device_id)
+                "payload" : str(assigned_id)
             }
             
             server_out = {
-                "device_id": new_device_id,
+                "device_id": assigned_id,
                 "type" : "client_assignment",
-                # "payload" : str(new_device_id)
+                # "payload" : str(assigned_id)
             }
 
             # Publishing to Cloud Data Topic
             local_client.publish(LOCAL_MESH_OUT_TOPIC.format(device_id), json.dumps(out))
             cloud_client.publish("mesh/", json.dumps(server_out))
-            print(f"New device registered {new_device_id}")
 
         # HEARTBEAT Packet Handling (For now plug in later)
         elif msg_type == "heartbeat":
