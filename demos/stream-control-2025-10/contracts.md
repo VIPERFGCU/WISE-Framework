@@ -1,6 +1,6 @@
 # Contracts
 
-## MQTT topics (per device_id like `bridge-esp32-001`)
+## MQTT topics (per device_id like `dev-sensor-001`)
 - Control (retained): `devices/<id>/control` → `{"cmd":"START"|"STOP","rate_hz":<int>}`
 - Status (retained):  `devices/<id>/status`  → `{"state":"online"|"offline"|"streaming"|"stopped","rate_hz":<int>,"ts":"<iso8601>"}`
 - Heartbeat:          `devices/<id>/heartbeat` → `{"rssi":-57,"uptime_s":123,"fw":"x.y.z","ts":"<iso8601>"}`

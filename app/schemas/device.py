@@ -11,4 +11,13 @@ class DeviceOut(BaseModel):
     device_id: str
     label: Optional[str] = None
     last_seen: Optional[datetime] = None
-    status: str # "online" | "offline"
+    status: str
+    sensing: bool = False
+    sample_hz: Optional[int] = None
+    batch_size: Optional[int] = None
+    uptime_seconds: Optional[int] = None
+
+
+class DeviceOutAdmin(DeviceOut):
+    # Secret returned to admins when registering a device so firmware can authenticate
+    mqtt_key: Optional[str] = None

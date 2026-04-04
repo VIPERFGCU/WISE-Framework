@@ -2,7 +2,10 @@
 __pycache__/
 *.py[cod]
 *$py.class
+<<<<<<< HEAD
 *.pyc
+=======
+>>>>>>> backend
 *.so
 .Python
 build/

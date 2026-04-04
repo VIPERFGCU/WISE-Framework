@@ -1,14 +1,14 @@
 # app/api/v1/control.py
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, Body
 from pydantic import BaseModel
 from app import deps
+from app.mqtt import publish_control 
+from app.services import devices as devices_svc
 import os, json, paho.mqtt.client as mqtt
 
 
-router = APIRouter(prefix="/api/devices", tags=["control"])
+router = APIRouter(prefix="/api/v1/devices", tags=["control"])
 
-MQTT_HOST = os.getenv("MQTT_HOST", "mosquitto")
-MQTT_PORT = int(os.getenv("MQTT_PORT", "1883"))
 
 class RateUpdate(BaseModel):
     rate_hz: int
@@ -16,86 +16,39 @@ class RateUpdate(BaseModel):
 class BatchUpdate(BaseModel):
     batch_size: int
 
-def _publish_control(device_id: str, payload: dict) -> None:
-    """
-    Publish a control message to the device's control topic.
-    Topic: devices/<device_id>/control
-    QoS 1, non-retained.
-    """
-    topic = f"devices/{device_id}/control"
-
-    cli = mqtt.Client(client_id="backend-control-pub", clean_session=True)
-    # If your broker requires auth, set it here:
-    # cli.username_pw_set(os.getenv("MQTT_USER",""), os.getenv("MQTT_PASS",""))
-
-    cli.connect(MQTT_HOST, MQTT_PORT, keepalive=20)
-    cli.loop_start()
-    try:
-        payload_str = json.dumps(payload)
-        # Publish with QoS 1 so ESP32 definitely gets it even with brief Wi-Fi jitter
-        info = cli.publish(topic, payload_str, qos=1, retain=False)
-        info.wait_for_publish(timeout=2.0)
-    finally:
-        cli.loop_stop()
-        cli.disconnect()
-
-@router.post(
-    "/{device_id}/start",
-    dependencies=[Depends(deps.require_api_key_or_role("admin"))],
-)
-async def start_device(device_id: str, body: dict = None):
-    rate_hz = (body or {}).get("rate_hz", 10)
-    try:
-        _publish_control(device_id, {"cmd": "START", "rate_hz": int(rate_hz)})
+@router.post("/{device_id}/start")
+async def start_device(device_id: str, body: dict = Body(None)):
+    rec = devices_svc.get(device_id)
+    rate_hz = (body or {}).get("rate_hz", getattr(rec, "preferred_rate_hz", None) or 10)
+    batch_size = (body or {}).get("batch_size", getattr(rec, "preferred_batch_size", None) or 1)
+    devices_svc.set_rate(device_id, int(rate_hz))
+    devices_svc.set_batch(device_id, int(batch_size))
+    if publish_control(device_id, {"cmd": "START", "rate_hz": int(rate_hz), "batch_size": int(batch_size)}):
         return {"ok": True}
-    except Exception as e:
-        raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY,
-                            detail=f"MQTT publish failed: {type(e).__name__}: {e}")
+    raise HTTPException(status_code=502, detail="MQTT publish failed")
 
-@router.post(
-    "/{device_id}/stop",
-    dependencies=[Depends(deps.require_api_key_or_role("admin"))],
-)
+@router.post("/{device_id}/stop")
 async def stop_device(device_id: str):
-    try:
-        _publish_control(device_id, {"cmd": "STOP"})
+    if publish_control(device_id, {"cmd": "STOP"}):
         return {"ok": True}
-    except Exception as e:
-        raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY,
-                            detail=f"MQTT publish failed: {type(e).__name__}: {e}")
+    raise HTTPException(status_code=502, detail="MQTT publish failed")
 
-@router.post(
-        "/{device_id}/rate",
-        dependencies=[Depends(deps.require_api_key_or_role("admin"))],
-)
+@router.post("/{device_id}/rate")
 async def set_device_rate(device_id: str, body: RateUpdate):
     """
     Update the sampling frequency (Hz) for a single device.
-    Sends: {"cmd": "SET_RATE", "rate_hz": <int>}
     """
-    try:
-        _publish_control(device_id, {"cmd": "SET_RATE", "rate_hz": int(body.rate_hz)})
+    devices_svc.set_rate(device_id, int(body.rate_hz))
+    if publish_control(device_id, {"cmd": "SET_RATE", "rate_hz": int(body.rate_hz)}):
         return {"ok": True}
-    except Exception as e:
-        raise HTTPException(
-                status_code=status.HTTP_502_BAD_GATEWAY,
-                detail=f"MQTT publish failed: {type(e).__name__}: {e}",
-            )
+    raise HTTPException(status_code=502, detail="MQTT publish failed")
 
-@router.post(
-        "/{device_id}/batch",
-        dependencies=[Depends(deps.require_api_key_or_role("admin"))],
-)
+@router.post("/{device_id}/batch")
 async def set_device_batch(device_id: str, body: BatchUpdate):
     """
     Update the batch size (samples per publish) for a single device.
-    Sends: {"cmd": "SET_BATCH", "batch_size": <int>}
     """
-    try:
-        _publish_control(device_id, {"cmd": "SET_BATCH", "batch_size": int(body.batch_size)})
+    devices_svc.set_batch(device_id, int(body.batch_size))
+    if publish_control(device_id, {"cmd": "SET_BATCH", "batch_size": int(body.batch_size)}):
         return {"ok": True}
-    except Exception as e:
-        raise HTTPException(
-                status_code=status.HTTP_502_BAD_GATEWAY,
-                detail=f"MQTT publish failed: {type(e).__name__}: {e}",
-            )
+    raise HTTPException(status_code=502, detail="MQTT publish failed")

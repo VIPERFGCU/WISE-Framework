@@ -17,18 +17,18 @@ cp .env.example .env
 # 2) Start the stack
 docker compose up --build
 
-# 3) Initialize InfluxDB at http://localhost:8086 (set org, bucket, and generate a token)
+# 3) Initialize InfluxDB at http://wise-net.io:8086 (set org, bucket, and generate a token)
 #    Update the .env file with the token and (optionally) restart the stack.
 #    You can also use docker exec to run influx setup non-interactively.
 
 # 4) Test health
-curl http://localhost:8000/health
+curl http://wise-net.io:8000/health
 
 # 5) Send a sample ingest
-curl -X POST http://localhost:8000/api/v1/ingest   -H "Content-Type: application/json"   -d '{"device_id":"esp32-1","ts":"2025-09-25T12:00:00Z","x":1.23,"y":-0.4,"z":0.77}'
+curl -X POST http://wise-net.io:8000/api/v1/ingest   -H "Content-Type: application/json"   -d '{"device_id":"esp32-1","ts":"2025-09-25T12:00:00Z","x":1.23,"y":-0.4,"z":0.77}'
 
 # 6) Query recent data (last 1h)
-curl "http://localhost:8000/api/v1/data?device_id=esp32-1&range=1h"
+curl "http://wise-net.io:8000/api/v1/data?device_id=esp32-1&range=1h"
 ```
 
 ### Dev tips
@@ -53,3 +53,11 @@ fastapi-backend/
   ├─ docker-compose.yml
   └─ README.md
 ```
+
+## Documentation
+
+Use the in-repo docs as the source of truth:
+
+- [Documentation Hub](docs/README.md)
+- [Section README template](docs/templates/section-readme-template.md)
+- [Runbook template](docs/templates/runbook-template.md)

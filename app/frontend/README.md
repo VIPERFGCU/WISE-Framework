@@ -1,73 +1,75 @@
-# React + TypeScript + Vite
+# Frontend Overview
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+This folder contains the WISENET web UI built with React, TypeScript, and Vite.
 
-Currently, two official plugins are available:
+## What This Section Owns
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) (or [oxc](https://oxc.rs) when used in [rolldown-vite](https://vite.dev/guide/rolldown)) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+- Authentication and protected routes
+- Dashboard and stream visualizations
+- Device and sensor profile experiences
+- Frontend API client and service integrations
 
-## React Compiler
+## Key Structure
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+- [app/frontend/src/pages](src/pages): page-level features and routes
+- [app/frontend/src/components](src/components): reusable UI components
+- [app/frontend/src/services](src/services): frontend-facing service calls
+- [app/frontend/src/api](src/api): API client setup
+- [app/frontend/src/lib](src/lib): shared utilities and normalization
 
-## Expanding the ESLint configuration
+## Route Map
 
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
+- `/` dashboard
+- `/devices` device table and status
+- `/streams` live stream charts
+- `/status` system status page
+- `/sensor/:sensorId` sensor profile page
+- `/login` sign-in page
+- `/admin` admin page (protected)
 
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
+## API Integration Basics
 
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
+- API client is configured in [app/frontend/src/api/client.ts](src/api/client.ts).
+- Base URL comes from `VITE_API_BASE_URL` and defaults to `/`.
+- JWT token is stored in local storage and attached as `Authorization: Bearer <token>`.
+- On `401`, token is cleared and the app redirects to `/login`.
 
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+## Environment Variables
+
+- `VITE_API_BASE_URL` example: `http://localhost:8000` for local API dev
+- `VITE_DEV_FAKE_AUTH=true` can be used during UI-only development
+
+## Local Run
+
+```bash
+cd app/frontend
+npm install
+npm run dev
 ```
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
+Open: `http://localhost:5173`
 
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
+## Build
 
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+```bash
+cd app/frontend
+npm run build
 ```
+
+## Quick Smoke Test
+
+1. Open `/login` and sign in.
+2. Confirm redirect to `/admin`.
+3. Go to `/devices` and verify list data loads.
+4. Go to `/streams` and verify charts render when data exists.
+
+## Documentation Rules
+
+- New page or route: update this README with ownership and data dependencies.
+- New API integration: document service file and expected response shape.
+- UI behavior changes: add before/after notes in the related feature docs.
+
+## Related Docs
+
+- [docs/README.md](../../docs/README.md)
+- [README.md](../../README.md)

@@ -3,7 +3,7 @@ from typing import Set
 from datetime import datetime, timezone
 from queue import Queue, Empty
 
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect, Body
+from fastapi import FastAPI, WebSocket, WebSocketDisconnect, Body, Request, Query
 from fastapi.middleware.cors import CORSMiddleware
 from starlette.responses import Response
 
@@ -12,13 +12,24 @@ from influxdb_client.client.write_api import SYNCHRONOUS
 from paho.mqtt import client as paho
 
 from app.api.v1 import devices, ingest, query, health, control, preview
+from app.api.v1 import auth
 from app.core.config import settings
 from app.deps import get_influx_client
+from app.services.influx import write_accel_point, write_heartbeat_sync
+from app.schemas.sensor import SensorReading, DeviceHeartbeat
+from app.mqtt import mqtt_client, publish_control, set_connection_event
+from app.services import devices as devices_svc
 
 # -------------------------------------------------------------------
 # App setup
 # -------------------------------------------------------------------
-app = FastAPI(title="Sensor Backend", version="0.2.0")
+app = FastAPI(
+    title="Sensor Backend", 
+    version="0.2.0",
+    docs_urls="/docs",
+    redoc_url="/redoc",
+    openapi_url="/openapi.json",
+)
 
 # Logging
 LOG_LEVEL = settings.api_log_level.upper()
@@ -30,12 +41,12 @@ log = logging.getLogger("sensor-backend")
 # -------------------------------------------------------------------
 raw_origins = settings.cors_allow_origins
 if isinstance(raw_origins, str):
-    # support comma-separated env like: "http://localhost:5173,http://127.0.0.1:5173"
+    # support comma-separated env like: "http://wise-net.io:5173,http://127.0.0.1:5173"
     origins = [o.strip() for o in raw_origins.split(",") if o.strip()]
 elif isinstance(raw_origins, (list, tuple)):
     origins = list(raw_origins)
 else:
-    origins = ["http://localhost:5173", "http://127.0.0.1:5173"]
+    origins = ["http://wise-net.io:5173", "http://127.0.0.1:5173"]
 
 app.add_middleware(
     CORSMiddleware,
@@ -54,6 +65,19 @@ async def cors_preflight_ok(rest_of_path: str) -> Response:
     # CORSMiddleware will add Access-Control-Allow-* headers
     return Response(status_code=200)
 
+
+@app.get("/api/v1/debug/cors")
+async def debug_cors(request: Request, origin: str | None = Query(default=None)):
+    requested_origin = origin or request.headers.get("origin")
+    wildcard = "*" in origins
+    is_allowed = bool(wildcard or (requested_origin and requested_origin in origins))
+    return {
+        "requested_origin": requested_origin,
+        "allowed": is_allowed,
+        "wildcard": wildcard,
+        "configured_origins": origins,
+    }
+
 # -------------------------------------------------------------------
 # Routers
 # -------------------------------------------------------------------
@@ -63,6 +87,20 @@ app.include_router(query.router)
 app.include_router(devices.router)
 app.include_router(control.router)
 app.include_router(preview.router)
+app.include_router(auth.router)
+
+# -------------------------------------------------------------------
+# Debug / Manual Control
+# -------------------------------------------------------------------
+@app.post("/api/v1/debug/start")
+async def debug_start_sensor(device_id: str = "dev-sensor-001"):
+    """
+    Manually triggers the sensor to start via the backend's MQTT logic.
+    This effectively tells the ESP32 to set 'streaming = true'.
+    """
+    if publish_control(device_id, {"cmd": "START", "rate_hz": 10}):
+        return {"status": "command sent"}
+    return {"status": "error", "message": "MQTT publish failed"}
 
 # -------------------------------------------------------------------
 # WebSocket broadcast hub (simple in-memory)
@@ -105,31 +143,128 @@ _mqtt_queue: Queue[str] = Queue()
 ENABLE_MQTT = os.getenv("ENABLE_MQTT", "true").lower() == "true"
 
 def _paho_on_connect(client, userdata, flags, reason_code, properties=None):
-    log.info(f"[MQTT] Connected (rc={reason_code}), subscribing to {MQTT_TOPIC}")
-    client.subscribe(MQTT_TOPIC)
+    if reason_code == 0:
+        log.info(f"[MQTT] Connected successfully, subscribing to devices/# and mesh/#")
+        client.subscribe("devices/#")
+        client.subscribe("mesh/#")
+        # Signal that we're connected
+        if hasattr(_paho_on_connect, "_event"):
+            _paho_on_connect._event.set()
+    else:
+        log.error(f"[MQTT] Connection failed with code {reason_code}")
 
 def _paho_on_message(client, userdata, msg):
     try:
-        _mqtt_queue.put_nowait((msg.topic, msg.payload.decode()))
+        # Standard Paho msg objects work similarly, but wrap in try/except for safety
+        payload = msg.payload.decode()
+        log.info(f"[MQTT TRACE] Topic: {msg.topic} | Payload: {payload}")
+        _mqtt_queue.put_nowait((msg.topic, payload))
     except Exception as e:
-        log.warning(f"[MQTT] Queue put failed: {type(e).__name__}: {e}")
+        log.warning(f"[MQTT] Processing failed: {e}")
 
 def _mqtt_thread():
+    # Create an event for signaling connection
+    connection_event = threading.Event()
+    _paho_on_connect._event = connection_event  # type: ignore
+    set_connection_event(connection_event)
+
+    mqtt_client.on_connect = _paho_on_connect
+    mqtt_client.on_message = _paho_on_message
+
+    # Attempt connect and use a non-blocking loop so FastAPI is not blocked
+    try:
+        log.info(f"[MQTT] Attempting connection to {MQTT_HOST}:{MQTT_PORT}")
+        mqtt_client.connect_async(MQTT_HOST, MQTT_PORT, keepalive=60)
+        # Use loop_start() to run network loop in background thread
+        mqtt_client.loop_start()
+    except Exception as e:
+        log.warning(f"[MQTT] Initial connect failed: {e}")
+
+    # Keep the thread alive (loop_start handles MQTT I/O)
     while True:
-        try:
-            client = paho.Client(paho.CallbackAPIVersion.VERSION2)
-            client.on_connect = _paho_on_connect
-            client.on_message = _paho_on_message
-            client.connect(MQTT_HOST, MQTT_PORT, keepalive=30)
-            client.loop_forever()
-        except Exception as e:
-            log.warning(f"[MQTT] Thread error: {type(e).__name__}: {e}; retrying in 2s")
-            time.sleep(2)
+        time.sleep(1)
 
 # -------------------------------------------------------------------
-# MQTT Consumer -> InfluxDB + WebSocket fan-out
+# WebSocket and Mesh Protocol Helpers
+# -------------------------------------------------------------------
+async def _safe_send(ws: WebSocket, msg: dict):
+    """Safely send a WebSocket message, handling closed connections."""
+    try:
+        await ws.send_json(msg)
+    except Exception as e:
+        log.debug(f"[WS] Send failed: {e}")
+
+def _process_mesh_data_message(data: dict, device_mac: str) -> list[SensorReading]:
+    """
+    Convert mesh protocol batched data to individual SensorReading objects.
+    
+    Input format (from firmware):
+    {
+        "id": "device_mac_address",
+        "type": "data",
+        "t_start": 1707432851000000,  # microseconds since epoch
+        "interval": 20000,             # microseconds between samples
+        "vals": [[x1,y1,z1], [x2,y2,z2], ...]
+    }
+    
+    Output: List of SensorReading objects with individual timestamps
+    """
+    readings = []
+    try:
+        t_start_us = data.get("t_start", 0)
+        interval_us = data.get("interval", 0)
+        vals = data.get("vals", [])
+        device_id = data.get("device_id") or data.get("id", device_mac)
+        # Normalize to string to prevent duplicates (e.g., 1 vs "1")
+        device_id = str(device_id)
+        
+        for idx, (x, y, z) in enumerate(vals):
+            # Calculate timestamp for this sample
+            ts_us = t_start_us + (idx * interval_us)
+            ts = datetime.fromtimestamp(ts_us / 1_000_000, tz=timezone.utc)
+            
+            reading = SensorReading(
+                device_id=device_id,
+                x=float(x),
+                y=float(y),
+                z=float(z),
+                ts=ts
+            )
+            readings.append(reading)
+    except Exception as e:
+        log.error(f"[Mesh] Failed to process data message: {e}")
+    
+    return readings
+
+def _process_mesh_assignment(data: dict) -> str:
+    """
+    Handle device assignment message from mesh protocol.
+    
+    Input format:
+    {
+        "id": "device_mac_address",
+        "type": "client_assignment"
+    }
+    
+    Returns: The device_id (MAC address)
+    """
+    device_id = data.get("device_id") or data.get("id")
+    if device_id:
+        # Normalize to string to prevent duplicates (e.g., 1 vs "1")
+        device_id = str(device_id)
+        # Auto-register the device
+        try:
+            devices_svc.register(device_id, label=device_id, notes="auto-registered-mesh-protocol")
+            log.info(f"[Mesh] Auto-registered device: {device_id}")
+        except Exception as e:
+            log.error(f"[Mesh] Failed to register device {device_id}: {e}")
+    return device_id
+
 # -------------------------------------------------------------------
 async def _drain_mqtt_queue():
+    """Consume messages placed on the thread-safe queue by the Paho callbacks.
+    Processes both devices/* (standard protocol) and mesh/* (batch protocol) topics.
+    """
     while True:
         try:
             topic, payload_raw = _mqtt_queue.get_nowait()
@@ -137,54 +272,137 @@ async def _drain_mqtt_queue():
             await asyncio.sleep(0.05)
             continue
 
-        # ---- parse & normalize ----
         try:
             data = json.loads(payload_raw)
+            parts = topic.split("/")
+            device_id = parts[1] if len(parts) >= 2 else "unknown"
+
+            # ===== DEVICES/* PROTOCOL =====
+            # Handle sensor data messages (devices/{id}/data)
+            if topic.startswith("devices/") and topic.endswith("/data"):
+                data["device_id"] = str(data.get("device_id") or device_id)
+                ts_str = data.get("ts")
+                ts = (datetime.fromisoformat(ts_str.replace("Z", "+00:00"))
+                      if ts_str else datetime.now(timezone.utc))
+                reading = SensorReading(**data)
+
+                try:
+                    from app.services.influx import write_accel_point_sync
+                    await asyncio.to_thread(write_accel_point_sync, reading, ts)
+                    log.info(f"[Influx] Write Success: {reading.device_id} at {ts}")
+                    # Keep device registry fresh so /api/v1/devices shows all active sensors
+                    devices_svc.touch_last_seen(reading.device_id, ts)
+                    # Broadcast to websocket clients
+                    try:
+                        msg = {
+                            "type": "data",
+                            "topic": topic,
+                            "device_id": reading.device_id,
+                            "ts": ts.isoformat(),
+                            "x": reading.x,
+                            "y": reading.y,
+                            "z": reading.z,
+                        }
+                        for ws in list(active_clients):
+                            asyncio.create_task(_safe_send(ws, msg))
+                    except Exception:
+                        pass
+                except Exception as e:
+                    log.error(f"[Influx] Write failed for {reading.device_id}: {e}")
+
+            # Handle heartbeat messages (devices/{id}/heartbeat)
+            elif topic.startswith("devices/") and topic.endswith("/heartbeat"):
+                data["device_id"] = str(data.get("device_id") or device_id)
+                ts_str = data.get("ts")
+                ts = (datetime.fromisoformat(ts_str.replace("Z", "+00:00"))
+                      if ts_str else datetime.now(timezone.utc))
+                hb = DeviceHeartbeat(**data)
+
+                try:
+                    await asyncio.to_thread(
+                        write_heartbeat_sync,
+                        hb.device_id or device_id,
+                        hb.rssi,
+                        hb.uptime_s,
+                        hb.fw,
+                        ts
+                    )
+                    log.info(f"[Influx] Heartbeat Write Success: {device_id} (rssi={hb.rssi})")
+                    # Refresh registry presence and recency for standard protocol devices
+                    devices_svc.touch_last_seen(hb.device_id or device_id, ts)
+                    # Broadcast heartbeat to websocket clients
+                    try:
+                        msg = {
+                            "type": "heartbeat",
+                            "topic": topic,
+                            "device_id": hb.device_id or device_id,
+                            "ts": ts.isoformat(),
+                            "rssi": hb.rssi,
+                            "uptime_s": hb.uptime_s,
+                            "fw": hb.fw,
+                        }
+                        for ws in list(active_clients):
+                            asyncio.create_task(_safe_send(ws, msg))
+                    except Exception:
+                        pass
+                except Exception as e:
+                    log.error(f"[Influx] Heartbeat Write failed for {device_id}: {e}")
+
+            # ===== MESH/* PROTOCOL =====
+            # Handle mesh protocol client assignment (device registration)
+            elif topic == "mesh" or topic.endswith("/"):
+                msg_type = data.get("type")
+                
+                if msg_type == "client_assignment":
+                    # Register the device
+                    registered_device_id = _process_mesh_assignment(data)
+                    # Touch last seen time
+                    if registered_device_id:
+                        devices_svc.touch_last_seen(registered_device_id)
+                    log.info(f"[Mesh] Device assignment processed: {registered_device_id}")
+                
+                elif msg_type == "data":
+                    # Convert mesh batched format to individual readings
+                    device_mac = data.get("id", device_id)
+                    readings = _process_mesh_data_message(data, device_mac)
+                    
+                    if readings:
+                        from app.services.influx import write_accel_point_sync
+                        for reading in readings:
+                            try:
+                                await asyncio.to_thread(write_accel_point_sync, reading, reading.ts)
+                                log.info(f"[Influx] Mesh Write Success: {reading.device_id} at {reading.ts}")
+                                
+                                # Broadcast to websocket clients
+                                try:
+                                    msg = {
+                                        "type": "data",
+                                        "topic": f"mesh/{device_mac}/data",
+                                        "device_id": reading.device_id,
+                                        "ts": reading.ts.isoformat(),
+                                        "x": reading.x,
+                                        "y": reading.y,
+                                        "z": reading.z,
+                                    }
+                                    for ws in list(active_clients):
+                                        asyncio.create_task(_safe_send(ws, msg))
+                                except Exception:
+                                    pass
+                            except Exception as e:
+                                log.error(f"[Influx] Mesh Write failed for {reading.device_id}: {e}")
+                        
+                        # Touch last seen for this device
+                        if readings:
+                            devices_svc.touch_last_seen(readings[-1].device_id, readings[-1].ts)
+                else:
+                    log.debug(f"[Mesh] Ignoring unknown message type: {msg_type} on {topic}")
+            
+            else:
+                log.debug(f"[MQTT] Ignoring message on {topic}")
+
         except Exception as e:
-            log.warning(f"[MQTT] bad JSON: {type(e).__name__}: {e}; payload={payload_raw!r}")
+            log.error(f"[Drain Error] Failed to process {topic}: {e}")
             continue
-
-        parts = topic.split("/")
-        device_from_topic = parts[1] if len(parts) >= 3 else None
-        device_id = data.get("device_id") or device_from_topic or "unknown"
-
-        ts_str = data.get("ts")
-        ts = (datetime.fromisoformat(ts_str.replace("Z", "+00:00"))
-              if ts_str else datetime.now(timezone.utc))
-
-        # ---- try Influx, but never block WS on failure ----
-        try:
-            client_influx = get_influx_client()
-            if client_influx:
-                write_api = client_influx.write_api(write_options=SYNCHRONOUS)
-                p = (Point("sensor_data")
-                     .tag("device_id", device_id)
-                     .field("x", float(data["x"]))
-                     .field("y", float(data["y"]))
-                     .field("z", float(data["z"]))
-                     .time(ts, WritePrecision.NS))
-                write_api.write(bucket=INFLUX_BUCKET, record=p)
-        except Exception as e:
-            log.warning(f"[Influx] write failed: {type(e).__name__}: {e}")
-
-        # ---- ALWAYS broadcast to WS ----
-        out = {
-            "device_id": device_id,
-            "x": data.get("x"),
-            "y": data.get("y"),
-            "z": data.get("z"),
-            "ts": ts.isoformat(),
-            "topic": topic,
-        }
-        msg = json.dumps(out)
-        sent = 0
-        for ws in list(active_clients):
-            try:
-                await ws.send_text(msg)
-                sent += 1
-            except Exception:
-                pass
-        log.info(f"[WS] broadcast to {sent} client(s): {out}")
 
 @app.on_event("startup")
 async def start_background_tasks():

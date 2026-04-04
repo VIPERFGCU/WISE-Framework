@@ -13,16 +13,16 @@ export async function listDevices(): Promise<Device[]> {
 
 export async function setRecording(sensorId: string, recording: boolean): Promise<void> {
 	if (!sensorId || sensorId === "unknown") throw new Error("Missing sensor id");
-	if (FAKE) { await sleep(400); return; } //pretend success
-	if (FAKE) { await sleep(300); return; }
-	// Try PUT first (405 earlier suggests POST may not exist)
-	await api.put(`/api/v1/devices/${encodeURIComponent(sensorId)}/recording`, { recording });
+	if (FAKE) { await sleep(400); return; }
+	const endpoint = recording ? "start" : "stop";
+	await api.post(`/api/v1/devices/${encodeURIComponent(sensorId)}/${endpoint}`);
 }
 
 export async function setSensing(sensorId: string, sensing: boolean): Promise<void> {
   if (!sensorId || sensorId === "unknown") throw new Error("Missing sensor id");
   if (FAKE) { await sleep(400); return; }
-  await api.put(`/api/v1/devices/${encodeURIComponent(sensorId)}/sensing`, { sensing });
+  const endpoint = sensing ? "start" : "stop";
+  await api.post(`/api/v1/devices/${encodeURIComponent(sensorId)}/${endpoint}`);
 }
 
 export async function setFrequency(deviceId: string, rateHz: number): Promise<void> {
@@ -30,7 +30,7 @@ export async function setFrequency(deviceId: string, rateHz: number): Promise<vo
   if (!Number.isFinite(rateHz) || rateHz <= 0) throw new Error("Invalid rateHz");
   if (FAKE) { await sleep(300); return; }
 
-  await api.post(`/api/devices/${encodeURIComponent(deviceId)}/rate`, {
+  await api.post(`/api/v1/devices/${encodeURIComponent(deviceId)}/rate`, {
     rate_hz: rateHz,
   });
 }
@@ -40,7 +40,7 @@ export async function setBatchSize(deviceId: string, batchSize: number): Promise
   if (!Number.isFinite(batchSize) || batchSize <= 0) throw new Error("Invalid batch size");
   if (FAKE) { await sleep(300); return; }
 
-  await api.post(`/api/devices/${encodeURIComponent(deviceId)}/batch`, {
+  await api.post(`/api/v1/devices/${encodeURIComponent(deviceId)}/batch`, {
     batch_size: batchSize,
   });
 }

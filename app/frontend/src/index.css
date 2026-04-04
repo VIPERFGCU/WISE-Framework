@@ -1,3 +1,90 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+@layer base {
+	:root {
+		color-scheme: dark;
+	}
+
+	html, body, #root {
+		height: 100%;
+	}
+
+	body {
+		@apply bg-slate-950 text-slate-100;
+		font-family: "Inter", "Segoe UI", system-ui, -apple-system, sans-serif;
+		letter-spacing: 0.01em;
+	}
+}
+
+@layer components {
+	.hud {
+		background: radial-gradient(1200px 800px at 20% -10%, rgba(56, 189, 248, 0.08), transparent 50%),
+			radial-gradient(800px 600px at 90% 10%, rgba(16, 185, 129, 0.08), transparent 45%),
+			#030712;
+		color: rgba(226, 232, 240, 0.95);
+	}
+
+	.hud::before {
+		content: "";
+		position: fixed;
+		inset: 0;
+		pointer-events: none;
+		background-image: linear-gradient(rgba(148, 163, 184, 0.08) 1px, transparent 1px),
+			linear-gradient(90deg, rgba(148, 163, 184, 0.08) 1px, transparent 1px);
+		background-size: 32px 32px;
+		opacity: 0.35;
+	}
+
+	.hud .bg-white {
+		background-color: rgba(8, 13, 25, 0.85) !important;
+	}
+
+	.hud .bg-gray-50 {
+		background-color: rgba(11, 18, 32, 0.9) !important;
+	}
+
+	.hud .border,
+	.hud .border-b,
+	.hud .border-r {
+		border-color: rgba(30, 64, 175, 0.35) !important;
+	}
+
+	.hud .text-gray-500,
+	.hud .text-gray-600 {
+		color: rgba(148, 163, 184, 0.85) !important;
+	}
+
+	.hud .text-gray-700,
+	.hud .text-gray-800,
+	.hud .text-gray-900 {
+		color: rgba(226, 232, 240, 0.95) !important;
+	}
+
+	.hud a {
+		color: rgba(125, 211, 252, 0.95);
+	}
+
+	.hud input,
+	.hud select,
+	.hud textarea {
+		background-color: rgba(15, 23, 42, 0.85) !important;
+		border-color: rgba(56, 189, 248, 0.35) !important;
+		color: rgba(226, 232, 240, 0.95) !important;
+	}
+
+	.hud button {
+		border-color: rgba(56, 189, 248, 0.35) !important;
+	}
+
+	.hud table {
+		background-color: rgba(8, 13, 25, 0.85) !important;
+	}
+
+	.hud .shadow,
+	.hud .shadow-sm,
+	.hud .shadow-md {
+		box-shadow: 0 0 0 1px rgba(56, 189, 248, 0.15), 0 12px 30px rgba(2, 6, 23, 0.6) !important;
+	}
+}

@@ -2,6 +2,7 @@ export type DeviceStatus = "on" | "off" | "updating";
 
 export interface Device {
 	sensor_id: string;
+	label?: string;
 	status: DeviceStatus;
 	recording: boolean;
 	sensing: boolean;

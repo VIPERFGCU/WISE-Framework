@@ -1,6 +1,43 @@
 {
+  "dev-sensor-001": {
+    "device_id": "dev-sensor-001",
+    "label": "dev-sensor-001",
+    "notes": "Test Node for Development",
+    "last_seen": "2026-03-22T17:57:43.854400+00:00",
+    "mqtt_key": null,
+    "preferred_rate_hz": 10,
+    "preferred_batch_size": 1
+  },
+  "dev-sensor-002": {
+    "device_id": "dev-sensor-002",
+    "label": "dev-sensor-002",
+    "notes": "Test Node for Development",
+    "last_seen": "2026-03-22T17:57:43.857959+00:00",
+    "mqtt_key": null,
+    "preferred_rate_hz": 10,
+    "preferred_batch_size": 1
+  },
+  "dev-sensor-003": {
+    "device_id": "dev-sensor-003",
+    "label": "dev-sensor-003",
+    "notes": "Test Node for Development",
+    "last_seen": "2026-03-22T17:57:43.881429+00:00",
+    "mqtt_key": null,
+    "preferred_rate_hz": 10,
+    "preferred_batch_size": 1
+  },
+  "bridge-esp32-001": {
+    "device_id": "bridge-esp32-001",
+    "label": null,
+    "notes": null,
+    "last_seen": "2026-03-22T17:40:14.270175+00:00",
+    "mqtt_key": null,
+    "preferred_rate_hz": null,
+    "preferred_batch_size": null
+  },
   "esp32-test-01": {
     "device_id": "esp32-test-01",
+<<<<<<< HEAD
     "label": "Test",
     "notes": "Test",
     "last_seen": null
@@ -10,5 +47,22 @@
     "label": "ESP32 Sensor",
     "notes": null,
     "last_seen": null
+=======
+    "label": null,
+    "notes": null,
+    "last_seen": "2026-03-22T17:40:14.266115+00:00",
+    "mqtt_key": null,
+    "preferred_rate_hz": null,
+    "preferred_batch_size": null
+  },
+  "sim-device-001": {
+    "device_id": "sim-device-001",
+    "label": null,
+    "notes": null,
+    "last_seen": "2026-03-22T17:40:14.300152+00:00",
+    "mqtt_key": null,
+    "preferred_rate_hz": null,
+    "preferred_batch_size": null
+>>>>>>> backend
   }
 }

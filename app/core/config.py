@@ -14,6 +14,9 @@ class Settings(BaseSettings):
         default=30,
         validation_alias=AliasChoices("ACCESS_TOKEN_EXPIRE_MINUTES", "TOKEN_EXPIRE_MINUTES"),
     )
+    # Admin credentials (dev/default)
+    admin_username: str = Field(default="admin", validation_alias=AliasChoices("ADMIN_USERNAME"))
+    admin_password: str = Field(default="admin", validation_alias=AliasChoices("ADMIN_PASSWORD"))
     jwt_issuer: Optional[str] = Field(default=None, validation_alias=AliasChoices("JWT_ISSUER"))
     jwt_audience: Optional[str] = Field(default=None, validation_alias=AliasChoices("JWT_AUDIENCE"))
 
