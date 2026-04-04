@@ -3,4 +3,5 @@
 *.elf
 *.a
 firmware/.pio/build
+__pycache__
 
