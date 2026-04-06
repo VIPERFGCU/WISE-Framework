@@ -19,10 +19,7 @@
 #include "esp_crt_bundle.h"
 
 // Production
-//#include "ntp_sensor_node.h"
-
-//Mock Data Testing
-#include "mock_sensor_node.h"
+#include "ntp_sensor_node.h"
 
 void ota_task(void *pvParameter);
 void broadcast_ota_to_mesh(void *arg);
@@ -255,10 +252,7 @@ void mesh_event_handler(void *arg, esp_event_base_t event_base, int32_t event_id
         }
         
         //Production
-        //ntp_sensor_node_init();
-
-        //Mock Data Testing
-        mock_sensor_node_init();
+        ntp_sensor_node_init();
 
         break;
     case MESH_EVENT_PARENT_DISCONNECTED:
