@@ -82,6 +82,6 @@ void ntp_sensor_node_init(){
   timerAlarmWrite(timer, MS_INTERVAL * 1000, true);
   timerAlarmEnable(timer);
 
-  Serial.println("Setup Complete");
+  ESP_LOGE("SENSOR","Setup Complete");
 }
 

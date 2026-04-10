@@ -17,7 +17,7 @@ void setup_mqtt() {
   // Size = 200 items (allows for ~2 seconds of buffer at 100Hz if wifi lags)
   dataQueue = xQueueCreate(200, sizeof(TimeStampedAccelData));
   if (dataQueue == NULL) {
-    Serial.println("Error creating MQTT Queue");
+    ESP_LOGE("SENSOR","Error creating MQTT Queue");
   }
 
   // Stack size set to 10240 words (40KB) because ArduinoJson requires significant memory
@@ -73,7 +73,7 @@ void mqtt_data_task(void *pvParameters) {
         local_batch.timestamp = incoming_data.timestamp;
         local_batch.interval = MS_INTERVAL; 
       }
-
+      ESP_LOGE("SENSOR","Received data with timestamp: %llu", local_batch.timestamp);
       // Add to local batch
       local_batch.ax[local_batch.cnt] = incoming_data.ax;
       local_batch.ay[local_batch.cnt] = incoming_data.ay;
@@ -106,6 +106,9 @@ void mqtt_data_task(void *pvParameters) {
 
         // Reset Batch
         local_batch.cnt = 0;
+
+        // Yield test to fix CPU Core 1 Traffic ---- For Testing, if Siang doesn't want to do this for PROD we'll revert and try and solve differently.
+        //vTaskDelay(pdMS_TO_TICKS(10));
       }
     }
   }

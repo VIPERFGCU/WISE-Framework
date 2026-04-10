@@ -17,12 +17,12 @@ void ntp_setup();
 WiFiUDP udp;
 //const int PPS_PIN = 4;  // WROOM
 // const int PPS_PIN = 27; // V2 - A Wroom
-const inst PPS_PIN = 11;  // s3
+const int PPS_PIN = 11;  // s3
 //const int PPS_PIN = 7 // unexpected maker v2
 const int NTP_PORT = 123;
 const int NTP_PACKET_SIZE = 48;
 byte packetBuffer[NTP_PACKET_SIZE];
-IPAddress ntpServer(10,100,100,1);  // Local ntp server( on linux )
+IPAddress ntpServer(10,42,0,1);  // Local ntp server( on Pi Gateway )
 // =========================
 // ====TIME SETTINGS=====
 const long  gmtOffset_sec = 0;     // Set your timezone offset in seconds
@@ -61,7 +61,7 @@ void IRAM_ATTR onPPS() {
 
 void init_time_task(void *pvParameters) {
   while (currentTime == 0) {
-    Serial.println("Waiting for PPS pulse to align NTP request...");
+    ESP_LOGE("SENSOR","Waiting for PPS pulse to align NTP request...");
 
     // 1. Clear the flag and wait for a PPS pulse to ensure we are at the very start of a second
     portENTER_CRITICAL(&timerMux);
@@ -69,55 +69,61 @@ void init_time_task(void *pvParameters) {
     portEXIT_CRITICAL(&timerMux);
 
     bool ppsSeen = false;
-    while (!ppsSeen) {
-      portENTER_CRITICAL(&timerMux);
-      ppsSeen = ppsFlag;
-      portEXIT_CRITICAL(&timerMux);
-      delay(10); // Poll every 10ms
-    }
+    // while (!ppsSeen) {
+    //   portENTER_CRITICAL(&timerMux);
+    //   ppsSeen = ppsFlag;
+    //   portEXIT_CRITICAL(&timerMux);
+    //   delay(10); // Poll every 10ms
+    // }
 
     // Capture the exact microsecond timestamp of the pulse we are syncing to
     portENTER_CRITICAL(&timerMux);
-    uint32_t syncPpsMicros = lastPpsMicros;
+    unsigned long syncPpsMicros = micros();
     portEXIT_CRITICAL(&timerMux);
 
     // Fetch NTP immediately AFTER the pulse. 
     time_t now = 0;
     
-    if (esp_mesh_is_root()) {
+    if (is_root) {
       // Root node fetches time from the external NTP server
       now = getNtpTime(ntpServer);
     } else {
       // Child nodes fetch time from the root via the mesh network
       now = getMeshTime();
     }
+    ESP_LOGE("SENSOR","Now: %ld", now);
+
+    unsigned long elapsedSincePps = micros() - syncPpsMicros;
+    ESP_LOGI("SENSOR","elapsedSincePps: %lu", elapsedSincePps);
 
     if (now == 0) {
-      Serial.println("No NTP response, retrying...");
+      ESP_LOGE("SENSOR","No NTP response, retrying...");
       delay(1000);
       continue;
     }
 
     // 3. Verify the NTP request didn't take so long that we crossed into the NEXT second
     portENTER_CRITICAL(&timerMux);
-    uint32_t elapsedSincePps = micros() - syncPpsMicros;
-    
+     
+    elapsedSincePps = micros() - syncPpsMicros;
+    ESP_LOGD("SENSOR","elapsedSincePps: %lu", (unsigned long)elapsedSincePps);
     // If the NTP fetch took less than 900ms, it belongs to the current second
     if (elapsedSincePps < 900000) { 
+      lastPpsMicros = micros(); // Reset the PPS timer to now, so future pulses are measured from this point
       currentTime = now;
       microsecondAccumulator = 0; // FIXED: Reset accumulator so onPPS cleanly adds 1 second on the next pulse
       
-      Serial.printf("Time synced to %ld (NTP latency: %u ms)\n", currentTime, elapsedSincePps / 1000);
+      // Serial.printf("Time synced to %ld (NTP latency: %u ms)\n", currentTime, elapsedSincePps / 1000);
       portEXIT_CRITICAL(&timerMux);
       break; // Sync successful, exit the while loop
     } else {
       // The network lagged and we got too close to the next second boundary. Retry.
       portEXIT_CRITICAL(&timerMux);
-      Serial.println("NTP response took too long, retrying to avoid race condition...");
+      ESP_LOGE("SENSOR","NTP response took too long, retrying to avoid race condition...");
     }
   }
   
-  Serial.println("init_time_task done, deleting task.");
+  ESP_LOGE("SENSOR","init_time_task done, deleting task.");
   vTaskDelete(NULL);
 }
 
@@ -156,22 +162,22 @@ unsigned long sendNTPpacket(IPAddress& address) {
 time_t getNtpTime(IPAddress& ntpServer) {
   udp.begin(NTP_PORT);  // Start listening on NTP port
 
-  Serial.println("Waiting on response");
+  ESP_LOGE("SENSOR","Waiting on response");
   sendNTPpacket(ntpServer);  // Send request
 
   // Wait forever for a response
   while (udp.parsePacket() == 0) {
     delay(10);  // Poll every 10ms
   }
-  Serial.println("Response obtained!");
+  ESP_LOGE("SENSOR","Response obtained!");
   int len = udp.read(packetBuffer, NTP_PACKET_SIZE);
   if (len < NTP_PACKET_SIZE) {
-    Serial.println("Malformed Response");
+    ESP_LOGE("SENSOR","Malformed Response");
     udp.stop();
     return 0;  // Malformed response
   }
 
-  Serial.println("Updating time...");
+  ESP_LOGE("SENSOR","Updating time...");
   // Extract the 32-bit transmit time (seconds since 1900)
   unsigned long highWord = word(packetBuffer[40], packetBuffer[41]);
   unsigned long lowWord  = word(packetBuffer[42], packetBuffer[43]);

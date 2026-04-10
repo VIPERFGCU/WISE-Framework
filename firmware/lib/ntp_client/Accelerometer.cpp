@@ -2,6 +2,7 @@
 #include "Accelerometer.h"
 #include <Arduino.h>
 #include "ntp_client.h"
+#include <Wire.h>
 
 // ================ Accelorometer Choice. Only enable 1 at a time ============
 #define USE_ISM 1
@@ -39,8 +40,9 @@ void get_accelerometer_data(float data[3]) {
 
 
 void init_accelerometer() {
+  Wire.begin(3,4);
   if(!ism330dhcx.begin_I2C()) {
-    Serial.println("Failed to find ism330dhcx accelemeter");
+    ESP_LOGE("SENSOR","Failed to find ism330dhcx accelemeter");
     while (1) {
       delay(10);
     }
@@ -95,7 +97,7 @@ void init_accelerometer() {
   if (!sox.begin_I2C()) {
     // if (!sox.begin_SPI(LSM_CS)) {
     // if (!sox.begin_SPI(LSM_CS, LSM_SCK, LSM_MISO, LSM_MOSI)) {
-     Serial.println("Failed to find LSM6DSOX chip");
+     ESP_LOGE("SENSOR","Failed to find LSM6DSOX chip");
     while (1) {
       delay(10);
     }

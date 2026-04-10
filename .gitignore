@@ -75,3 +75,8 @@ htmlcov/
 
 # Git
 .git/
+\
+# Platform io
+firmware/
+build/
+.pio/

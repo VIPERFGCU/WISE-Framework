@@ -2,12 +2,24 @@ import paho.mqtt.client as mqtt
 import json
 import time
 from datetime import datetime, timezone
+from influxdb_client import InfluxDBClient, Point, WritePrecision
+from influxdb_client.client.write_api import ASYNCHRONOUS
+
+# --- INFLUXDB CONFIG ---
+INFLUX_URL = "http://wise-net.io:8086"
+INFLUX_TOKEN = "super-long-admin-token"  # Replace with your actual token
+INFLUX_ORG = "my-org"
+INFLUX_BUCKET = "sensors"
+
+# Initialize Influx Client
+influx_client = InfluxDBClient(url=INFLUX_URL, token=INFLUX_TOKEN, org=INFLUX_ORG)
+write_api = influx_client.write_api(write_options=ASYNCHRONOUS)
 
 # --- CONFIG ---
-# CLOUD_BROKER_HOST = "34.70.15.187" 
+CLOUD_BROKER_HOST = "wise-net.io" 
 
 # Dev Env IP.
-CLOUD_BROKER_HOST = "10.42.0.59"
+#CLOUD_BROKER_HOST = "10.42.0.59"
 CLOUD_BROKER_PORT = 1883
 
 # Backend Topic Schema
@@ -51,10 +63,11 @@ def on_local_message(client, userdata, msg):
         if msg_type == "data":
             # Extract Batch Info
             vals = raw.get("vals", [])
+
             base_ts_us = int(raw.get("t_start", 0)) * 1000 
             interval_us = int(raw.get("interval", 0)) * 1_000_000
 
-            # --- TIMING ADJUSTMENT LOGIC ---
+                        # --- TIMING ADJUSTMENT LOGIC ---
             if device_id in upload_timing:
                 expected_base_ts = upload_timing[device_id]
                 
@@ -68,23 +81,32 @@ def on_local_message(client, userdata, msg):
                 else:
                     print(f"[WARN] {device_id}: Large time gap/drift detected. Resetting baseline.")
             
+            # -------------------------------
+
+            points_buffer = []
+
+            for i, record in enumerate(vals):
+                if len(record) < 3: continue
+                
+                current_ts = base_ts_us + (i * interval_us)
+
+                p = Point("accelerometer") \
+                    .tag("device_id", device_id) \
+                    .field("x", float(record[0])) \
+                    .field("y", float(record[1])) \
+                    .field("z", float(record[2])) \
+                    .time(current_ts, WritePrecision.NS)
+                
+                points_buffer.append(p)
+                                        
             # Update expected next timestamp for the next batch from this device
             upload_timing[device_id] = base_ts_us + (len(vals) * interval_us)
 
-            # --- FORWARD BATCH TO CLOUD MQTT ---
-            # Repackage the data with the mathematically corrected timestamp
-            out_payload = {
-                "device_id": device_id,
-                "type": "data_batch",
-                "t_start_us": base_ts_us,
-                "interval_us": interval_us,
-                "vals": vals
-            }
-
-            if len(vals) > 0:
-                cloud_client.publish(TOPIC_DATA.format(device_id), json.dumps(out_payload))
-                print(f"[DATA] Forwarded batch of {len(vals)} records for {device_id} to Cloud")
-
+            # Bulk write to InfluxDB
+            if len(points_buffer) > 0:
+                write_api.write(bucket=INFLUX_BUCKET, org=INFLUX_ORG, record=points_buffer)
+                print(f"[DATA] Wrote {len(points_buffer)} records for {device_id}")
+                
         elif msg_type == "client_assignment":
             # First request from every newly connected client device
             if device_id in mac_to_id_map:

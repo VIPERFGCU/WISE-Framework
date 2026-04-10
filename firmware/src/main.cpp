@@ -39,7 +39,7 @@ typedef struct {
 } mesh_ota_packet_t;
 
 static const char *TAG = "mesh_main";
-static bool is_root = false;
+bool is_root = false;
 static bool mqtt_connected = false;
 static esp_mqtt_client_handle_t mqtt_client = NULL;
 char device_id[32]; 
@@ -93,7 +93,7 @@ static void mqtt_event_handler(void *handler_args, esp_event_base_t base, int32_
                 return;
             }
             
-            ESP_LOGW(TAG, "[OTA] Received Propagate Command! Exact Size: %lu", fw_size);
+            ESP_LOGW(TAG, "[OTA] Received Propagate Command! Exact Size: %lu", (unsigned long)fw_size);
             xTaskCreate(broadcast_ota_to_mesh, "mesh_broadcast", 8192, (void*)fw_size, 5, NULL);
         }
         break;
@@ -120,7 +120,7 @@ void start_mqtt() {
 void send_mesh_packet(const char *json_payload) {
     if (is_root && mqtt_connected) {
         esp_mqtt_client_publish(mqtt_client, "mesh/data", json_payload, 0, 0, 0);
-        ESP_LOGI(TAG, "ROOT TX: %s", json_payload);
+        //ESP_LOGI(TAG, "ROOT TX: %s", json_payload);
     } else {
         mesh_data_t data;
         data.data = (uint8_t *)json_payload;
@@ -168,9 +168,9 @@ void mesh_p2p_rx_task(void *arg) {
     mesh_addr_t from;
     mesh_data_t data;
     int flag = 0;
-    data.data = (uint8_t*)heap_caps_malloc(1500, MALLOC_CAP_8BIT);    //Buffer size.
+    data.data = (uint8_t*)heap_caps_malloc(6000, MALLOC_CAP_8BIT);    //Buffer size.
     while (1) {
-        data.size = 1500;
+        data.size = 6000;
         // Listen for any packet.
         if (esp_mesh_recv(&from, &data, portMAX_DELAY, &flag, NULL, 0) == ESP_OK) {
             
@@ -219,9 +219,10 @@ void ip_event_handler(void *arg, esp_event_base_t event_base, int32_t event_id, 
         ESP_LOGI(TAG, ">>> ROOT GOT IP: " IPSTR " <<<", IP2STR(&event->ip_info.ip));
         
         // Start MQTT
-        if (is_root) {
+        // if (is_root) {
             start_mqtt();
-        }
+            ntp_sensor_node_init();
+        // }
     }
 }
 // --- MESH EVENT HANDLER ---
@@ -249,12 +250,11 @@ void mesh_event_handler(void *arg, esp_event_base_t event_base, int32_t event_id
             is_root = false;
             ESP_LOGI(TAG, ">>> I AM NODE <<<");
             xTaskCreate(mesh_p2p_rx_task, "p2p_rx", 3072, NULL, 5, NULL);
+            ntp_sensor_node_init(); // Sensor initialization if child.
         }
-        
-        //Production
-        ntp_sensor_node_init();
-
+        //ntp_sensor_node_init(); <----- Moved to ip_event_handler() so the Root Node only starts once the Pi has successfully handed it an IP.
         break;
+
     case MESH_EVENT_PARENT_DISCONNECTED:
         if (is_root) { 
             esp_mqtt_client_stop(mqtt_client); 
@@ -392,6 +392,8 @@ void ota_task(void *pvParameter) {
 }
 
 void setup(void) {
+    //Arduino Logs
+    Serial.begin(115200);
     // NVS Init
     esp_err_t ret = nvs_flash_init();
     if (ret == ESP_ERR_NVS_NO_FREE_PAGES || ret == ESP_ERR_NVS_NEW_VERSION_FOUND) {
@@ -447,4 +449,7 @@ void setup(void) {
     ESP_LOGI(TAG, "DEVICE ID: %s (v2.0.9 OTA SUCCESS)", device_id);
     //ESP_LOGI(TAG, "DEVICE ID: %s (v2.0.10)", device_id);
 }
-void loop() {};
+void loop() {
+    // Yield test to fix CPU Core 1 Traffic ---- For Testing, if Siang doesn't want to do this for PROD we'll revert and try and solve differently.
+    vTaskDelete(NULL);
+};

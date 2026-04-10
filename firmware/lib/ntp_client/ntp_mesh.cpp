@@ -46,7 +46,7 @@ void handle_mesh_time_request(mesh_addr_t *from) {
     res.type = MESH_PACKET_TIME_RES;
     
     // getEpochTime() returns microseconds. Convert back to seconds for the response
-    res.current_time = (time_t)(getEpochTime() / 1000000ULL);  PRODUCTION
+    res.current_time = (time_t)(getEpochTime() / 1000000ULL);  //PRODUCTION
 
     mesh_data_t res_data;
     res_data.data = (uint8_t*)&res;

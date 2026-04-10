@@ -1,0 +1,5 @@
+adafruit/Adafruit Unified Sensor @ ^1.1.14
+bblanchon/ArduinoJson @ ^6.21.3
+adafruit/Adafruit BusIO @ ^1.16.0
+adafruit/Adafruit LSM6DS @ ^4.7.0
+knolleary/PubSubClient @ ^2.8
