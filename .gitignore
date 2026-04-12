@@ -69,6 +69,10 @@ Thumbs.db
 .coverage
 htmlcov/
 
+# Keep frontend TypeScript utilities trackable.
+!app/frontend/src/lib/
+!app/frontend/src/lib/*.ts
+
 # Docker
 .docker/
 
