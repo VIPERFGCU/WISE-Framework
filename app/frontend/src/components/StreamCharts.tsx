@@ -300,7 +300,7 @@ export function SpectrumBars({
   color,
   noDataClassName = "text-sm text-gray-500",
   xLabel = "Frequency (Hz)",
-  yLabel = "Amplitude",
+  yLabel = "Amplitude (g)",
 }: {
   bins: SpectrumBin[];
   color: string;

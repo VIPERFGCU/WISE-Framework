@@ -6,6 +6,8 @@ import { isTelemetryTimestampSane } from "../lib/time";
 import { emitError } from "../components/Toaster";
 
 const ALL_SENSORS_VALUE = "__all__";
+const DEV_SENSOR_PREFIX = "dev-sensor-";
+const FILTER_METRICS_KEY = "wisenet.filteredTelemetry";
 
 type AxisSpectrum = {
   axis: string;
@@ -36,6 +38,24 @@ export default function Streams() {
   const [liveHeartbeat, setLiveHeartbeat] = useState<HeartbeatPoint | null>(null);
   const wsRef = useRef<WebSocket | null>(null);
 
+  function isDevSensorId(v: unknown): boolean {
+    return typeof v === "string" && v.toLowerCase().startsWith(DEV_SENSOR_PREFIX);
+  }
+
+  function useDevSineOverlay(): boolean {
+    return device === ALL_SENSORS_VALUE || isDevSensorId(device);
+  }
+
+  function buildSinePoint(ts: string, idx: number): StreamPoint {
+    const phase = idx * 0.24;
+    return {
+      t: ts,
+      x: Math.sin(phase),
+      y: Math.sin(phase + (2 * Math.PI) / 3),
+      z: Math.sin(phase + (4 * Math.PI) / 3),
+    };
+  }
+
   function buildStreamWsUrl(): string {
     const apiBase = import.meta.env.VITE_API_BASE_URL as string | undefined;
     const base = apiBase && apiBase !== "/" ? apiBase : window.location.origin;
@@ -60,9 +80,11 @@ export default function Streams() {
               setDroppedWsPoints((n) => n + 1);
               return;
             }
-            const p: StreamPoint = { t: msg.ts, x: msg.x, y: msg.y, z: msg.z };
             setLivePoints(prev => {
-              const next = [...prev, p].slice(-200);
+              const nextPoint = isDevSensorId(msg.device_id)
+                ? buildSinePoint(msg.ts, prev.length)
+                : { t: msg.ts, x: msg.x, y: msg.y, z: msg.z };
+              const next = [...prev, nextPoint].slice(-200);
               return next;
             });
           } else if (msg.type === "heartbeat") {
@@ -110,7 +132,12 @@ export default function Streams() {
       
       // Parse accelerometer data
       if (accelRaw.length > 0) {
-        const pts = accelValid.map((p: any) => ({ t: p.t, x: p.x, y: p.y, z: p.z }));
+        const pts = accelValid.map((p: any, idx: number) => {
+          if (useDevSineOverlay()) {
+            return buildSinePoint(p.t, idx);
+          }
+          return { t: p.t, x: p.x, y: p.y, z: p.z };
+        });
         setPoints(pts);
       } else if (!silent) {
         setPoints([]);
@@ -194,6 +221,21 @@ export default function Streams() {
     const id = setInterval(() => loadSpectrum(), 5000);
     return () => clearInterval(id);
   }, [device, windowS, viewMode]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(
+        FILTER_METRICS_KEY,
+        JSON.stringify({
+          apiDropped: droppedApiPoints,
+          liveDropped: droppedWsPoints,
+          ts: Date.now(),
+        }),
+      );
+    } catch {
+      // no-op if storage is unavailable
+    }
+  }, [droppedApiPoints, droppedWsPoints]);
 
   const downloadCsv = async () => {
     if (!device) return;
@@ -331,7 +373,7 @@ export default function Streams() {
                 { data: livePoints.map(p => p.x), color: '#ef4444', label: 'X' },
                 { data: livePoints.map(p => p.y), color: '#06b6d4', label: 'Y' },
                 { data: livePoints.map(p => p.z), color: '#10b981', label: 'Z' }
-              ]} xValues={livePoints.map((p) => p.t)} xLabel="Time" yLabel="Accel" />
+              ]} xValues={livePoints.map((p) => p.t)} xLabel="Time (s)" yLabel="Accel (g)" />
             )}
           </div>
         </div>
@@ -357,13 +399,13 @@ export default function Streams() {
         {/* Heartbeat Graph */}
         {heartbeatPoints.length > 0 && (
           <div className="mb-6">
-            <div className="text-sm text-gray-600 font-semibold mb-2">Signal Strength (RSSI)</div>
+            <div className="text-sm text-gray-600 font-semibold mb-2">Signal Strength (RSSI, dBm)</div>
             <Sparkline
               data={heartbeatPoints.map(p => p.rssi)}
               color="#8b5cf6"
               xValues={heartbeatPoints.map((p) => p.t)}
-              xLabel="Time"
-              yLabel="RSSI"
+              xLabel="Time (s)"
+              yLabel="RSSI (dBm)"
             />
           </div>
         )}
@@ -371,19 +413,19 @@ export default function Streams() {
         {/* Accelerometer Graphs */}
         {points.length > 0 && (
           <div>
-            <div className="text-sm text-gray-600 font-semibold mb-2">Combined X / Y / Z</div>
+            <div className="text-sm text-gray-600 font-semibold mb-2">Combined X / Y / Z (g)</div>
             <MultiSparkline series={[
               { data: points.map(p => p.x), color: '#ef4444', label: 'X' },
               { data: points.map(p => p.y), color: '#06b6d4', label: 'Y' },
               { data: points.map(p => p.z), color: '#10b981', label: 'Z' }
-            ]} xValues={points.map((p) => p.t)} xLabel="Time" yLabel="Accel" />
+            ]} xValues={points.map((p) => p.t)} xLabel="Time (s)" yLabel="Accel (g)" />
             <div className="h-4" />
-            <div className="text-sm text-gray-600 font-semibold mb-2">X axis</div>
-            <Sparkline data={points.map(p => p.x)} color="#ef4444" xValues={points.map((p) => p.t)} xLabel="Time" yLabel="X" />
-            <div className="text-sm text-gray-600 font-semibold mt-4 mb-2">Y axis</div>
-            <Sparkline data={points.map(p => p.y)} color="#06b6d4" xValues={points.map((p) => p.t)} xLabel="Time" yLabel="Y" />
-            <div className="text-sm text-gray-600 font-semibold mt-4 mb-2">Z axis</div>
-            <Sparkline data={points.map(p => p.z)} color="#10b981" xValues={points.map((p) => p.t)} xLabel="Time" yLabel="Z" />
+            <div className="text-sm text-gray-600 font-semibold mb-2">X axis (g)</div>
+            <Sparkline data={points.map(p => p.x)} color="#ef4444" xValues={points.map((p) => p.t)} xLabel="Time (s)" yLabel="X (g)" />
+            <div className="text-sm text-gray-600 font-semibold mt-4 mb-2">Y axis (g)</div>
+            <Sparkline data={points.map(p => p.y)} color="#06b6d4" xValues={points.map((p) => p.t)} xLabel="Time (s)" yLabel="Y (g)" />
+            <div className="text-sm text-gray-600 font-semibold mt-4 mb-2">Z axis (g)</div>
+            <Sparkline data={points.map(p => p.z)} color="#10b981" xValues={points.map((p) => p.t)} xLabel="Time (s)" yLabel="Z (g)" />
           </div>
         )}
 
@@ -391,7 +433,7 @@ export default function Streams() {
           <div className="space-y-6">
             {spectra.map((s) => (
               <div key={s.axis}>
-                <div className="text-sm text-gray-700 font-semibold mb-1">{s.axis.toUpperCase()} spectrum</div>
+                <div className="text-sm text-gray-700 font-semibold mb-1">{s.axis.toUpperCase()} spectrum (Hz)</div>
                 <div className="text-xs text-gray-500 mb-2">
                   Fs={s.sample_rate_hz.toFixed(2)} Hz, N={s.window_samples}, dominant={s.dominant_frequency_hz ? `${s.dominant_frequency_hz.toFixed(2)} Hz` : "n/a"}
                 </div>

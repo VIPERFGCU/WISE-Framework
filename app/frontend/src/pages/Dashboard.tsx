@@ -7,6 +7,7 @@ import { api } from "../api/client";
 
 const STALE_SEC = 120;
 const HISTORY_POINTS = 30;
+const FILTER_METRICS_KEY = "wisenet.filteredTelemetry";
 
 type HealthState = "ok" | "degraded";
 
@@ -137,8 +138,8 @@ function AreaOperationsChart({ data }: { data: Snapshot[] }) {
 					<line x1={cursorX} y1={height - padY} x2={cursorX} y2={scrubY} stroke="rgba(148,163,184,0.45)" strokeWidth="1" />
 					<circle cx={cursorX} cy={cursorY} r={4} fill="#38bdf8" />
 					<circle cx={cursorX} cy={scrubY} r={5} fill="#ffffff" stroke="#38bdf8" strokeWidth={2} />
-					<text x={(padX + width - padX) / 2} y={height - 6} textAnchor="middle" fontSize="12" fill="#94a3b8">Sample</text>
-					<text x={12} y={height / 2} textAnchor="middle" fontSize="12" fill="#94a3b8" transform={`rotate(-90 12 ${height / 2})`}>Messages/min</text>
+					<text x={(padX + width - padX) / 2} y={height - 6} textAnchor="middle" fontSize="12" fill="#94a3b8">Sample (idx)</text>
+					<text x={12} y={height / 2} textAnchor="middle" fontSize="12" fill="#94a3b8" transform={`rotate(-90 12 ${height / 2})`}>Messages/min (count)</text>
 					<defs>
 						<linearGradient id="opsArea" x1="0" y1="0" x2="0" y2="1">
 							<stop offset="0%" stopColor="rgba(56,189,248,0.45)" />
@@ -201,6 +202,8 @@ export default function Dashboard() {
 	const [apiOk, setApiOk] = useState(false);
 	const [influxOk, setInfluxOk] = useState(false);
 	const [wsOpen, setWsOpen] = useState(false);
+	const [filteredApiDropped, setFilteredApiDropped] = useState(0);
+	const [filteredLiveDropped, setFilteredLiveDropped] = useState(0);
 	const [history, setHistory] = useState<Snapshot[]>([]);
 	const [messageTimes, setMessageTimes] = useState<number[]>([]);
 
@@ -292,6 +295,24 @@ export default function Dashboard() {
 		};
 	}, []);
 
+	useEffect(() => {
+		const readMetrics = () => {
+			try {
+				const raw = localStorage.getItem(FILTER_METRICS_KEY);
+				if (!raw) return;
+				const parsed = JSON.parse(raw);
+				setFilteredApiDropped(Number(parsed?.apiDropped) || 0);
+				setFilteredLiveDropped(Number(parsed?.liveDropped) || 0);
+			} catch {
+				// ignore malformed localStorage payloads
+			}
+		};
+
+		readMetrics();
+		const id = setInterval(readMetrics, 5000);
+		return () => clearInterval(id);
+	}, []);
+
 	const total = devices.length;
 	const on = devices.filter(d => d.status === "on").length;
 	const off = devices.filter(d => d.status === "off").length;
@@ -374,11 +395,15 @@ export default function Dashboard() {
 				<div className="text-xs text-slate-400">Live command center</div>
 			</div>
 
-			<div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
+			<div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-5">
 				<HealthPill label="API" state={apiOk ? "ok" : "degraded"} latencyMs={apiLatencyMs} />
 				<HealthPill label="Influx Query" state={influxOk ? "ok" : "degraded"} latencyMs={influxLatencyMs} />
 				<HealthPill label="Device Poll" state={typeof devicesLatencyMs === "number" ? "ok" : "degraded"} latencyMs={devicesLatencyMs} />
 				<HealthPill label="MQTT Stream" state={wsOpen ? "ok" : "degraded"} />
+				<div className="rounded border border-sky-500/40 bg-sky-500/15 px-3 py-2 text-sm text-sky-200">
+					<div className="font-medium">Telemetry Filter</div>
+					<div className="text-xs opacity-90">API dropped: {filteredApiDropped} • Live dropped: {filteredLiveDropped}</div>
+				</div>
 			</div>
 
 			<div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
