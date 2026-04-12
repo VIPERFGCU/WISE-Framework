@@ -2,6 +2,8 @@ import { useEffect, useState } from "react";
 import { api } from "../api/client";
 import { useRef } from "react";
 import { MultiSparkline, Sparkline, SpectrumBars, type HeartbeatPoint, type StreamPoint, type SpectrumBin } from "../components/StreamCharts";
+import { isTelemetryTimestampSane } from "../lib/time";
+import { emitError } from "../components/Toaster";
 
 const ALL_SENSORS_VALUE = "__all__";
 
@@ -52,12 +54,14 @@ export default function Streams() {
         try {
           const msg = JSON.parse(ev.data);
           if (msg.type === "data") {
+            if (!isTelemetryTimestampSane(msg.ts)) return;
             const p: StreamPoint = { t: msg.ts, x: msg.x, y: msg.y, z: msg.z };
             setLivePoints(prev => {
               const next = [...prev, p].slice(-200);
               return next;
             });
           } else if (msg.type === "heartbeat") {
+            if (!isTelemetryTimestampSane(msg.ts)) return;
             const hb: HeartbeatPoint = { t: msg.ts, rssi: msg.rssi };
             setLiveHeartbeat(hb);
           }
@@ -90,7 +94,9 @@ export default function Streams() {
       
       // Parse accelerometer data
       if (res.data?.accel?.series) {
-        const pts = res.data.accel.series.map((p: any) => ({ t: p.t, x: p.x, y: p.y, z: p.z }));
+        const pts = res.data.accel.series
+          .filter((p: any) => isTelemetryTimestampSane(p?.t))
+          .map((p: any) => ({ t: p.t, x: p.x, y: p.y, z: p.z }));
         setPoints(pts);
       } else if (!silent) {
         setPoints([]);
@@ -98,7 +104,9 @@ export default function Streams() {
 
       // Parse heartbeat data
       if (res.data?.heartbeat?.series) {
-        const hbPts = res.data.heartbeat.series.map((p: any) => ({ t: p.t, rssi: p.rssi }));
+        const hbPts = res.data.heartbeat.series
+          .filter((p: any) => isTelemetryTimestampSane(p?.t))
+          .map((p: any) => ({ t: p.t, rssi: p.rssi }));
         setHeartbeatPoints(hbPts);
       } else if (!silent) {
         setHeartbeatPoints([]);
@@ -181,8 +189,14 @@ export default function Streams() {
       setDownloadingCsv(true);
       const params = new URLSearchParams();
       if (csvFrom && csvTo) {
-        params.set("start_ts", new Date(csvFrom).toISOString());
-        params.set("end_ts", new Date(csvTo).toISOString());
+        const start = new Date(csvFrom);
+        const end = new Date(csvTo);
+        if (!Number.isFinite(start.getTime()) || !Number.isFinite(end.getTime())) {
+          emitError("Please enter valid CSV date/time values.");
+          return;
+        }
+        params.set("start_ts", start.toISOString());
+        params.set("end_ts", end.toISOString());
       } else {
         params.set("window_s", String(windowS));
       }

@@ -7,6 +7,7 @@ import StatusBadge from "../components/StatusBadge";
 import BoolPill from "../components/BoolPill";
 import { MultiSparkline, Sparkline, type HeartbeatPoint, type StreamPoint } from "../components/StreamCharts";
 import { formatUptime, parseIsoMs, timeAgo } from "../lib/format";
+import { isTelemetryTimestampSane } from "../lib/time";
 
 export default function SensorProfile() {
   const { sensorId } = useParams<{ sensorId: string }>();
@@ -70,8 +71,16 @@ export default function SensorProfile() {
         const accelSeries = Array.isArray(res.data?.accel?.series) ? res.data.accel.series : [];
         const hbSeries = Array.isArray(res.data?.heartbeat?.series) ? res.data.heartbeat.series : [];
         if (!cancelled) {
-          setPoints(accelSeries.map((p: any) => ({ t: p.t, x: p.x, y: p.y, z: p.z })));
-          setHeartbeatPoints(hbSeries.map((p: any) => ({ t: p.t, rssi: p.rssi })));
+          setPoints(
+            accelSeries
+              .filter((p: any) => isTelemetryTimestampSane(p?.t))
+              .map((p: any) => ({ t: p.t, x: p.x, y: p.y, z: p.z }))
+          );
+          setHeartbeatPoints(
+            hbSeries
+              .filter((p: any) => isTelemetryTimestampSane(p?.t))
+              .map((p: any) => ({ t: p.t, rssi: p.rssi }))
+          );
         }
       } catch (e: any) {
         if (!cancelled) {

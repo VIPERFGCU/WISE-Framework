@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { parseTelemetryTimestampMs } from "../lib/time";
 
 export type StreamPoint = { t: string; x: number; y: number; z: number };
 export type HeartbeatPoint = { t: string; rssi: number };
@@ -44,8 +45,8 @@ function formatOffset(minutesEast: number): string {
 
 function defaultXFormatter(v: string | number): string {
   if (typeof v === "number") return String(v);
-  const t = Date.parse(v);
-  if (!Number.isNaN(t)) {
+  const t = parseTelemetryTimestampMs(v);
+  if (t !== null) {
     const d = new Date(t);
     const yyyy = d.getFullYear();
     const mm = String(d.getMonth() + 1).padStart(2, "0");
