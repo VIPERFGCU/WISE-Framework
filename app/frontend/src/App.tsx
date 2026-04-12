@@ -4,7 +4,6 @@ import Dashboard from "./pages/Dashboard";
 import Devices from "./pages/Devices";
 import Streams from "./pages/Streams";
 import Admin from "./pages/Admin";
-import Status from "./pages/Status";
 import NotFound from "./pages/NotFound";
 import ProtectedRoute from "./auth/ProtectedRoute";
 import Login from "./pages/Login";
@@ -23,7 +22,6 @@ export default function App() {
 	<Route element={<ProtectedRoute />}>
 		<Route path="admin" element={<Admin />} />
 	</Route>
-        <Route path="status" element={<Status />} />
 	<Route path="*" element={<NotFound />} />
       </Route>
     </Routes>

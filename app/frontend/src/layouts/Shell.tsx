@@ -29,7 +29,6 @@ export default function Shell() {
       <NavLink to="/devices" className={navLinkClass} onClick={() => setMobileNavOpen(false)}>Devices</NavLink>
       <NavLink to="/streams" className={navLinkClass} onClick={() => setMobileNavOpen(false)}>Streams</NavLink>
       <NavLink to={isAuthed() ? "/admin" : "/login"} className={navLinkClass} onClick={() => setMobileNavOpen(false)}>Admin</NavLink>
-      <NavLink to="/status" className={navLinkClass} onClick={() => setMobileNavOpen(false)}>Status</NavLink>
     </>
   );
 
