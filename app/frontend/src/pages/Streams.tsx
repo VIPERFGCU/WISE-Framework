@@ -29,6 +29,8 @@ export default function Streams() {
   const [csvFrom, setCsvFrom] = useState<string>("");
   const [csvTo, setCsvTo] = useState<string>("");
   const [devices, setDevices] = useState<{ device_id: string; label?: string }[]>([]);
+  const [droppedApiPoints, setDroppedApiPoints] = useState(0);
+  const [droppedWsPoints, setDroppedWsPoints] = useState(0);
   // Live MQTT stream via backend WebSocket
   const [livePoints, setLivePoints] = useState<StreamPoint[]>([]);
   const [liveHeartbeat, setLiveHeartbeat] = useState<HeartbeatPoint | null>(null);
@@ -54,14 +56,20 @@ export default function Streams() {
         try {
           const msg = JSON.parse(ev.data);
           if (msg.type === "data") {
-            if (!isTelemetryTimestampSane(msg.ts)) return;
+            if (!isTelemetryTimestampSane(msg.ts)) {
+              setDroppedWsPoints((n) => n + 1);
+              return;
+            }
             const p: StreamPoint = { t: msg.ts, x: msg.x, y: msg.y, z: msg.z };
             setLivePoints(prev => {
               const next = [...prev, p].slice(-200);
               return next;
             });
           } else if (msg.type === "heartbeat") {
-            if (!isTelemetryTimestampSane(msg.ts)) return;
+            if (!isTelemetryTimestampSane(msg.ts)) {
+              setDroppedWsPoints((n) => n + 1);
+              return;
+            }
             const hb: HeartbeatPoint = { t: msg.ts, rssi: msg.rssi };
             setLiveHeartbeat(hb);
           }
@@ -91,22 +99,26 @@ export default function Streams() {
         setLoading(true);
       }
       const res = await api.get(`/api/preview/${encodeURIComponent(device)}?window_s=${windowS}`);
+
+      const accelRaw = Array.isArray(res.data?.accel?.series) ? res.data.accel.series : [];
+      const hbRaw = Array.isArray(res.data?.heartbeat?.series) ? res.data.heartbeat.series : [];
+
+      const accelValid = accelRaw.filter((p: any) => isTelemetryTimestampSane(p?.t));
+      const hbValid = hbRaw.filter((p: any) => isTelemetryTimestampSane(p?.t));
+
+      setDroppedApiPoints((accelRaw.length - accelValid.length) + (hbRaw.length - hbValid.length));
       
       // Parse accelerometer data
-      if (res.data?.accel?.series) {
-        const pts = res.data.accel.series
-          .filter((p: any) => isTelemetryTimestampSane(p?.t))
-          .map((p: any) => ({ t: p.t, x: p.x, y: p.y, z: p.z }));
+      if (accelRaw.length > 0) {
+        const pts = accelValid.map((p: any) => ({ t: p.t, x: p.x, y: p.y, z: p.z }));
         setPoints(pts);
       } else if (!silent) {
         setPoints([]);
       }
 
       // Parse heartbeat data
-      if (res.data?.heartbeat?.series) {
-        const hbPts = res.data.heartbeat.series
-          .filter((p: any) => isTelemetryTimestampSane(p?.t))
-          .map((p: any) => ({ t: p.t, rssi: p.rssi }));
+      if (hbRaw.length > 0) {
+        const hbPts = hbValid.map((p: any) => ({ t: p.t, rssi: p.rssi }));
         setHeartbeatPoints(hbPts);
       } else if (!silent) {
         setHeartbeatPoints([]);
@@ -287,6 +299,13 @@ export default function Streams() {
         {viewMode === "frequency" && device === ALL_SENSORS_VALUE && (
           <div className="text-sm text-amber-700 bg-amber-50 border border-amber-200 rounded p-2 mb-3">
             Frequency view currently supports one device at a time. Select a specific device to compute FFT.
+          </div>
+        )}
+        {viewMode === "time" && (droppedApiPoints > 0 || droppedWsPoints > 0) && (
+          <div className="text-xs text-amber-800 bg-amber-50 border border-amber-200 rounded px-2 py-1 mb-3 inline-flex gap-2">
+            <span>Filtered invalid timestamps</span>
+            <span>API: {droppedApiPoints}</span>
+            <span>Live: {droppedWsPoints}</span>
           </div>
         )}
         {/* Live stream panel */}
