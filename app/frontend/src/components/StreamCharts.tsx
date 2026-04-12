@@ -27,6 +27,10 @@ function clampIndex(value: number, max: number): number {
   return Math.max(0, Math.min(max, value));
 }
 
+function safeFixed(value: unknown, digits: number): string {
+  return typeof value === "number" && Number.isFinite(value) ? value.toFixed(digits) : "-";
+}
+
 function axisStroke() {
   return "#94a3b8";
 }
@@ -103,6 +107,7 @@ export function Sparkline({
 
   const min = Math.min(...data);
   const max = Math.max(...data);
+  const safeCursor = clampIndex(cursor, data.length - 1);
   const scaleX = (i: number) => g.left + (i / Math.max(1, data.length - 1)) * (g.w - g.left - g.right);
   const scaleY = (v: number) => {
     if (max === min) return (g.top + g.h - g.bottom) / 2;
@@ -110,8 +115,8 @@ export function Sparkline({
   };
   const pathD = data.map((v, i) => `${i === 0 ? "M" : "L"} ${scaleX(i)} ${scaleY(v)}`).join(" ");
 
-  const cursorX = scaleX(cursor);
-  const cursorY = scaleY(data[cursor]);
+  const cursorX = scaleX(safeCursor);
+  const cursorY = scaleY(data[safeCursor]);
 
   const onPointerMove = (event: React.PointerEvent<SVGSVGElement>) => {
     setCursor(pointerIndexFromEvent(event, data.length, g));
@@ -126,9 +131,9 @@ export function Sparkline({
   const tipTop = Math.max(g.top + 4, cursorY - 38);
   const scrubY = g.h - 22;
   const xDisplay =
-    xValues && xValues[cursor] !== undefined
-      ? (xValueFormatter ?? defaultXFormatter)(xValues[cursor])
-      : `idx ${cursor}`;
+    xValues && xValues[safeCursor] !== undefined
+      ? (xValueFormatter ?? defaultXFormatter)(xValues[safeCursor])
+      : `idx ${safeCursor}`;
 
   return (
     <div className="relative">
@@ -158,7 +163,7 @@ export function Sparkline({
       </svg>
       <div className="pointer-events-none absolute rounded border border-slate-300 bg-white/95 px-2 py-1 text-xs text-slate-700 shadow" style={{ left: `${(tipLeft / g.w) * 100}%`, top: `${(tipTop / g.h) * 100}%` }}>
         <div>x: {xDisplay}</div>
-        <div>value: {data[cursor].toFixed(3)}</div>
+        <div>value: {safeFixed(data[safeCursor], 3)}</div>
       </div>
     </div>
   );
@@ -195,6 +200,7 @@ export function MultiSparkline({
     setCursor((prev) => clampIndex(prev, maxLen - 1));
   }, [maxLen]);
 
+  const safeCursor = clampIndex(cursor, maxLen - 1);
   const min = Math.min(...values), max = Math.max(...values);
   const scaleX = (i: number) => g.left + (i / Math.max(1, maxLen - 1)) * (g.w - g.left - g.right);
   const scaleY = (v: number) => {
@@ -211,16 +217,16 @@ export function MultiSparkline({
     setCursor(pointerIndexFromEvent(event, maxLen, g));
   };
 
-  const cursorX = scaleX(cursor);
+  const cursorX = scaleX(safeCursor);
   const scrubY = g.h - 22;
   const xDisplay =
-    xValues && xValues[cursor] !== undefined
-      ? (xValueFormatter ?? defaultXFormatter)(xValues[cursor])
-      : `idx ${cursor}`;
+    xValues && xValues[safeCursor] !== undefined
+      ? (xValueFormatter ?? defaultXFormatter)(xValues[safeCursor])
+      : `idx ${safeCursor}`;
   const tooltipRows = series
     .filter((s) => s.data.length > 0)
     .map((s) => {
-      const idx = clampIndex(cursor, s.data.length - 1);
+      const idx = clampIndex(safeCursor, s.data.length - 1);
       return {
         label: s.label ?? "series",
         color: s.color,
@@ -258,7 +264,7 @@ export function MultiSparkline({
           <line x1={cursorX} y1={g.top} x2={cursorX} y2={g.h - g.bottom} stroke="rgba(56,189,248,0.95)" strokeDasharray="6 4" strokeWidth={1.8} />
           {series.map((s) => {
             if (s.data.length === 0) return null;
-            const idx = clampIndex(cursor, s.data.length - 1);
+            const idx = clampIndex(safeCursor, s.data.length - 1);
             const y = scaleY(s.data[idx]);
             return (
               <g key={`${s.label ?? s.color}-cursor`}>
@@ -280,7 +286,7 @@ export function MultiSparkline({
           {tooltipRows.map((row) => (
             <div key={row.label} className="flex items-center gap-1">
               <span style={{ width: 8, height: 8, borderRadius: 99, background: row.color, display: "inline-block" }} />
-              <span>{row.label}: {row.value.toFixed(3)}</span>
+              <span>{row.label}: {safeFixed(row.value, 3)}</span>
             </div>
           ))}
         </div>
@@ -310,6 +316,7 @@ export function SpectrumBars({
     setCursor((prev) => clampIndex(prev, bins.length - 1));
   }, [bins.length]);
 
+  const safeCursor = clampIndex(cursor, bins.length - 1);
   const maxAmp = Math.max(...bins.map((b) => b.amplitude), 1e-9);
   const barW = (g.w - g.left - g.right) / bins.length;
   const scrubY = g.h - 22;
@@ -323,9 +330,9 @@ export function SpectrumBars({
     setCursor(pointerIndexFromEvent(event, bins.length, g));
   };
 
-  const cursorX = g.left + cursor * barW + barW / 2;
+  const cursorX = g.left + safeCursor * barW + barW / 2;
   const tipLeft = Math.min(82, Math.max(2, (cursorX / g.w) * 100));
-  const selected = bins[cursor];
+  const selected = bins[safeCursor];
 
   return (
     <div className="relative">
@@ -367,9 +374,9 @@ export function SpectrumBars({
         <text x={12} y={(g.top + g.h - g.bottom) / 2} textAnchor="middle" fontSize="11" fill="#64748b" transform={`rotate(-90 12 ${(g.top + g.h - g.bottom) / 2})`}>{yLabel}</text>
       </svg>
       <div className="pointer-events-none absolute rounded border border-slate-300 bg-white/95 px-2 py-1 text-xs text-slate-700 shadow" style={{ left: `${tipLeft}%`, top: "8%" }}>
-        <div>bin: {cursor}</div>
-        <div>f: {selected.f_hz.toFixed(2)} Hz</div>
-        <div>a: {selected.amplitude.toFixed(4)}</div>
+        <div>bin: {safeCursor}</div>
+        <div>f: {safeFixed(selected?.f_hz, 2)} Hz</div>
+        <div>a: {safeFixed(selected?.amplitude, 4)}</div>
       </div>
     </div>
   );
