@@ -3,7 +3,7 @@
     "device_id": "dev-sensor-001",
     "label": "dev-sensor-001",
     "notes": "Test Node for Development",
-    "last_seen": "2026-04-13T22:20:49.265876+00:00",
+    "last_seen": "2026-04-13T22:35:52.022421+00:00",
     "mqtt_key": null,
     "preferred_rate_hz": 10,
     "preferred_batch_size": 1
@@ -12,7 +12,7 @@
     "device_id": "dev-sensor-002",
     "label": "dev-sensor-002",
     "notes": "Test Node for Development",
-    "last_seen": "2026-04-13T22:20:49.274823+00:00",
+    "last_seen": "2026-04-13T22:35:52.014569+00:00",
     "mqtt_key": null,
     "preferred_rate_hz": 10,
     "preferred_batch_size": 1
@@ -21,7 +21,7 @@
     "device_id": "dev-sensor-003",
     "label": "dev-sensor-003",
     "notes": "Test Node for Development",
-    "last_seen": "2026-04-13T22:20:49.260590+00:00",
+    "last_seen": "2026-04-13T22:35:52.019379+00:00",
     "mqtt_key": null,
     "preferred_rate_hz": 10,
     "preferred_batch_size": 1
