@@ -7,6 +7,10 @@
 		color-scheme: dark;
 	}
 
+	html.theme-light {
+		color-scheme: light;
+	}
+
 	html, body, #root {
 		height: 100%;
 	}
@@ -15,6 +19,10 @@
 		@apply bg-slate-950 text-slate-100;
 		font-family: "Inter", "Segoe UI", system-ui, -apple-system, sans-serif;
 		letter-spacing: 0.01em;
+	}
+
+	html.theme-light body {
+		@apply bg-slate-100 text-slate-900;
 	}
 }
 
@@ -26,6 +34,13 @@
 		color: rgba(226, 232, 240, 0.95);
 	}
 
+	html.theme-light .hud {
+		background: radial-gradient(1200px 800px at 20% -10%, rgba(14, 116, 144, 0.14), transparent 52%),
+			radial-gradient(900px 620px at 90% 10%, rgba(22, 163, 74, 0.1), transparent 48%),
+			#f8fafc;
+		color: rgba(15, 23, 42, 0.96);
+	}
+
 	.hud::before {
 		content: "";
 		position: fixed;
@@ -35,6 +50,32 @@
 			linear-gradient(90deg, rgba(148, 163, 184, 0.08) 1px, transparent 1px);
 		background-size: 32px 32px;
 		opacity: 0.35;
+	}
+
+	html.theme-light .hud::before {
+		background-image: linear-gradient(rgba(30, 41, 59, 0.08) 1px, transparent 1px),
+			linear-gradient(90deg, rgba(30, 41, 59, 0.08) 1px, transparent 1px);
+		opacity: 0.18;
+	}
+
+	html.theme-light .hud [class*="bg-slate-95"],
+	html.theme-light .hud [class*="bg-slate-900"],
+	html.theme-light .hud [class*="bg-slate-800"] {
+		background-color: rgba(241, 245, 249, 0.88) !important;
+	}
+
+	html.theme-light .hud [class*="text-slate-100"],
+	html.theme-light .hud [class*="text-slate-200"],
+	html.theme-light .hud [class*="text-slate-300"] {
+		color: rgba(15, 23, 42, 0.96) !important;
+	}
+
+	html.theme-light .hud [class*="text-slate-400"] {
+		color: rgba(51, 65, 85, 0.95) !important;
+	}
+
+	html.theme-light .hud [class*="border-slate"] {
+		border-color: rgba(148, 163, 184, 0.7) !important;
 	}
 
 	.hud .bg-white {
