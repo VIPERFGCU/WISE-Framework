@@ -78,6 +78,61 @@
 		border-color: rgba(148, 163, 184, 0.7) !important;
 	}
 
+	/* Improve readability for semantic pills/badges in light mode. */
+	html.theme-light .hud [class*="text-emerald-200"] {
+		color: #065f46 !important;
+	}
+
+	html.theme-light .hud [class*="text-amber-200"] {
+		color: #92400e !important;
+	}
+
+	html.theme-light .hud [class*="text-rose-300"] {
+		color: #9f1239 !important;
+	}
+
+	html.theme-light .hud [class*="bg-emerald-500/"] {
+		background-color: rgba(16, 185, 129, 0.2) !important;
+	}
+
+	html.theme-light .hud [class*="bg-amber-500/"] {
+		background-color: rgba(245, 158, 11, 0.2) !important;
+	}
+
+	html.theme-light .hud [class*="bg-rose-500/"] {
+		background-color: rgba(244, 63, 94, 0.2) !important;
+	}
+
+	html.theme-light .hud [class*="border-emerald-500/"] {
+		border-color: rgba(5, 150, 105, 0.55) !important;
+	}
+
+	html.theme-light .hud [class*="border-amber-500/"] {
+		border-color: rgba(217, 119, 6, 0.55) !important;
+	}
+
+	html.theme-light .hud [class*="border-rose-500/"] {
+		border-color: rgba(225, 29, 72, 0.55) !important;
+	}
+
+	/* Sidebar/link accent contrast in light mode. */
+	html.theme-light .hud [class*="text-sky-100"],
+	html.theme-light .hud [class*="text-sky-200"] {
+		color: #0c4a6e !important;
+	}
+
+	html.theme-light .hud [class*="bg-sky-500/"] {
+		background-color: rgba(14, 116, 144, 0.18) !important;
+	}
+
+	html.theme-light .hud [class*="border-sky-500/"] {
+		border-color: rgba(14, 116, 144, 0.45) !important;
+	}
+
+	html.theme-light .hud [class*="hover:bg-slate-800/"]:hover {
+		background-color: rgba(203, 213, 225, 0.65) !important;
+	}
+
 	.hud .bg-white {
 		background-color: rgba(8, 13, 25, 0.85) !important;
 	}
