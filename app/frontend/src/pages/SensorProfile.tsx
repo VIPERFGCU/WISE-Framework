@@ -7,6 +7,23 @@ import StatusBadge from "../components/StatusBadge";
 import BoolPill from "../components/BoolPill";
 import { MultiSparkline, Sparkline, type HeartbeatPoint, type StreamPoint } from "../components/StreamCharts";
 import { formatUptime, parseIsoMs, timeAgo } from "../lib/format";
+import { isTelemetryTimestampSane } from "../lib/time";
+
+const DEV_SENSOR_PREFIX = "dev-sensor-";
+
+function isDevSensorId(v: unknown): boolean {
+  return typeof v === "string" && v.toLowerCase().startsWith(DEV_SENSOR_PREFIX);
+}
+
+function buildSinePoint(ts: string, idx: number): StreamPoint {
+  const phase = idx * 0.24;
+  return {
+    t: ts,
+    x: Math.sin(phase),
+    y: Math.sin(phase + (2 * Math.PI) / 3),
+    z: Math.sin(phase + (4 * Math.PI) / 3),
+  };
+}
 
 export default function SensorProfile() {
   const { sensorId } = useParams<{ sensorId: string }>();
@@ -70,8 +87,20 @@ export default function SensorProfile() {
         const accelSeries = Array.isArray(res.data?.accel?.series) ? res.data.accel.series : [];
         const hbSeries = Array.isArray(res.data?.heartbeat?.series) ? res.data.heartbeat.series : [];
         if (!cancelled) {
-          setPoints(accelSeries.map((p: any) => ({ t: p.t, x: p.x, y: p.y, z: p.z })));
-          setHeartbeatPoints(hbSeries.map((p: any) => ({ t: p.t, rssi: p.rssi })));
+          const showDevSine = isDevSensorId(decodedSensorId);
+          setPoints(
+            accelSeries
+              .filter((p: any) => isTelemetryTimestampSane(p?.t))
+              .map((p: any, idx: number) => {
+                if (showDevSine) return buildSinePoint(p.t, idx);
+                return { t: p.t, x: p.x, y: p.y, z: p.z };
+              })
+          );
+          setHeartbeatPoints(
+            hbSeries
+              .filter((p: any) => isTelemetryTimestampSane(p?.t))
+              .map((p: any) => ({ t: p.t, rssi: p.rssi }))
+          );
         }
       } catch (e: any) {
         if (!cancelled) {
@@ -177,13 +206,13 @@ export default function SensorProfile() {
 
                 {heartbeatPoints.length > 0 && (
                   <div className="mb-6">
-                    <div className="text-sm text-slate-300 font-semibold mb-2">Signal Strength (RSSI)</div>
+                    <div className="text-sm text-slate-300 font-semibold mb-2">Signal Strength (RSSI, dBm)</div>
                     <Sparkline
                       data={heartbeatPoints.map((p) => p.rssi)}
                       color="#8b5cf6"
                       xValues={heartbeatPoints.map((p) => p.t)}
-                      xLabel="Time"
-                      yLabel="RSSI"
+                      xLabel="Time (s)"
+                      yLabel="RSSI (dBm)"
                       noDataClassName="text-sm text-slate-400"
                     />
                   </div>
@@ -191,13 +220,13 @@ export default function SensorProfile() {
 
                 {points.length > 0 && (
                   <div>
-                    <div className="text-sm text-slate-300 font-semibold mb-2">Combined X / Y / Z</div>
+                    <div className="text-sm text-slate-300 font-semibold mb-2">Combined X / Y / Z (g)</div>
                     <MultiSparkline
                       legendClassName="flex items-center gap-3 text-xs text-slate-400 mb-1"
                       noDataClassName="text-sm text-slate-400"
                       xValues={points.map((p) => p.t)}
-                      xLabel="Time"
-                      yLabel="Accel"
+                      xLabel="Time (s)"
+                      yLabel="Accel (g)"
                       series={[
                         { data: points.map((p) => p.x), color: "#ef4444", label: "X" },
                         { data: points.map((p) => p.y), color: "#06b6d4", label: "Y" },
@@ -206,14 +235,14 @@ export default function SensorProfile() {
                     />
 
                     <div className="h-4" />
-                    <div className="text-sm text-slate-300 font-semibold mb-2">X axis</div>
-                    <Sparkline data={points.map((p) => p.x)} color="#ef4444" xValues={points.map((p) => p.t)} xLabel="Time" yLabel="X" noDataClassName="text-sm text-slate-400" />
+                    <div className="text-sm text-slate-300 font-semibold mb-2">X axis (g)</div>
+                    <Sparkline data={points.map((p) => p.x)} color="#ef4444" xValues={points.map((p) => p.t)} xLabel="Time (s)" yLabel="X (g)" noDataClassName="text-sm text-slate-400" />
 
-                    <div className="text-sm text-slate-300 font-semibold mt-4 mb-2">Y axis</div>
-                    <Sparkline data={points.map((p) => p.y)} color="#06b6d4" xValues={points.map((p) => p.t)} xLabel="Time" yLabel="Y" noDataClassName="text-sm text-slate-400" />
+                    <div className="text-sm text-slate-300 font-semibold mt-4 mb-2">Y axis (g)</div>
+                    <Sparkline data={points.map((p) => p.y)} color="#06b6d4" xValues={points.map((p) => p.t)} xLabel="Time (s)" yLabel="Y (g)" noDataClassName="text-sm text-slate-400" />
 
-                    <div className="text-sm text-slate-300 font-semibold mt-4 mb-2">Z axis</div>
-                    <Sparkline data={points.map((p) => p.z)} color="#10b981" xValues={points.map((p) => p.t)} xLabel="Time" yLabel="Z" noDataClassName="text-sm text-slate-400" />
+                    <div className="text-sm text-slate-300 font-semibold mt-4 mb-2">Z axis (g)</div>
+                    <Sparkline data={points.map((p) => p.z)} color="#10b981" xValues={points.map((p) => p.t)} xLabel="Time (s)" yLabel="Z (g)" noDataClassName="text-sm text-slate-400" />
                   </div>
                 )}
               </section>

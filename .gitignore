@@ -28,7 +28,9 @@ MANIFEST
 venv/
 ENV/
 env/
-.venv
+.venv/
+.direnv/
+.jwtenv/
 
 # IDE
 .vscode/
@@ -69,6 +71,10 @@ Thumbs.db
 .pytest_cache/
 .coverage
 htmlcov/
+
+# Keep frontend TypeScript utilities trackable.
+!app/frontend/src/lib/
+!app/frontend/src/lib/*.ts
 
 # Docker
 .docker/
