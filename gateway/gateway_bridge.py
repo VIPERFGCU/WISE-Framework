@@ -6,7 +6,7 @@ from influxdb_client import InfluxDBClient, Point, WritePrecision
 from influxdb_client.client.write_api import ASYNCHRONOUS
 
 # --- INFLUXDB CONFIG ---
-INFLUX_URL = "http://wise-net.io:8086"
+INFLUX_URL = "http://10.42.0.59:8086"
 INFLUX_TOKEN = "super-long-admin-token"  # Replace with your actual token
 INFLUX_ORG = "my-org"
 INFLUX_BUCKET = "sensors"
@@ -16,10 +16,10 @@ influx_client = InfluxDBClient(url=INFLUX_URL, token=INFLUX_TOKEN, org=INFLUX_OR
 write_api = influx_client.write_api(write_options=ASYNCHRONOUS)
 
 # --- CONFIG ---
-CLOUD_BROKER_HOST = "wise-net.io" 
+#CLOUD_BROKER_HOST = "wise-net.io" 
 
 # Dev Env IP.
-#CLOUD_BROKER_HOST = "10.42.0.59"
+CLOUD_BROKER_HOST = "10.42.0.59"
 CLOUD_BROKER_PORT = 1883
 
 # Backend Topic Schema

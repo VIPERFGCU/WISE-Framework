@@ -350,7 +350,7 @@ async def _drain_mqtt_queue():
 
             # ===== MESH/* PROTOCOL =====
             # Handle mesh protocol client assignment (device registration)
-            elif topic == "mesh" or topic.endswith("/"):
+            elif topic.startswith("mesh/"):
                 msg_type = data.get("type")
                 
                 if msg_type == "client_assignment":
