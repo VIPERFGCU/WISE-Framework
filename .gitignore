@@ -27,7 +27,9 @@ MANIFEST
 venv/
 ENV/
 env/
-.venv
+.venv/
+.direnv/
+.jwtenv/
 
 # IDE
 .vscode/
