@@ -44,8 +44,6 @@ mac_to_id_map = {}  # Dictionary to store MAC -> Assigned ID mappings
 
 upload_timing = {}
 
-upload_timing = {}
-
 def on_local_connect(client, userdata, flags, rc, props):
     print(f"[LOCAL] Connected to broker with result code: {rc}")
     client.subscribe(LOCAL_MESH_IN_TOPIC)

@@ -1,0 +1,56 @@
+{
+  "dev-sensor-001": {
+    "device_id": "dev-sensor-001",
+    "label": "dev-sensor-001",
+    "notes": "Test Node for Development",
+    "last_seen": "2026-04-17T00:46:05.371332+00:00",
+    "mqtt_key": null,
+    "preferred_rate_hz": 10,
+    "preferred_batch_size": 1
+  },
+  "dev-sensor-002": {
+    "device_id": "dev-sensor-002",
+    "label": "dev-sensor-002",
+    "notes": "Test Node for Development",
+    "last_seen": "2026-04-17T00:46:04.534625+00:00",
+    "mqtt_key": null,
+    "preferred_rate_hz": 10,
+    "preferred_batch_size": 1
+  },
+  "dev-sensor-003": {
+    "device_id": "dev-sensor-003",
+    "label": "dev-sensor-003",
+    "notes": "Test Node for Development",
+    "last_seen": "2026-04-17T00:46:04.934311+00:00",
+    "mqtt_key": null,
+    "preferred_rate_hz": 10,
+    "preferred_batch_size": 1
+  },
+  "bridge-esp32-001": {
+    "device_id": "bridge-esp32-001",
+    "label": null,
+    "notes": null,
+    "last_seen": "2026-03-22T17:40:14.270175+00:00",
+    "mqtt_key": null,
+    "preferred_rate_hz": null,
+    "preferred_batch_size": null
+  },
+  "esp32-test-01": {
+    "device_id": "esp32-test-01",
+    "label": null,
+    "notes": null,
+    "last_seen": "2026-03-22T17:40:14.266115+00:00",
+    "mqtt_key": null,
+    "preferred_rate_hz": null,
+    "preferred_batch_size": null
+  },
+  "sim-device-001": {
+    "device_id": "sim-device-001",
+    "label": null,
+    "notes": null,
+    "last_seen": "2026-03-22T17:40:14.300152+00:00",
+    "mqtt_key": null,
+    "preferred_rate_hz": null,
+    "preferred_batch_size": null
+  }
+}
