@@ -1,11 +1,127 @@
+
 services:
+  api:
+    build:
+      context: .
+      dockerfile: ./Dockerfile
+    container_name: fastapi-api
+    networks:
+      - wisenet-network
+    env_file:
+      - .env
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./:/app
+    depends_on:
+      - influxdb
+      - mosquitto
+    command: >
+      uvicorn app.main:app
+      --host 0.0.0.0
+      --port 8000
+      --forwarded-allow-ips='*'
+      --reload
+    environment:
+      - MQTT_SUBSCRIBE_TOPIC=devices/#
+      - INFLUX_URL=http://influxdb:8086  
+      - INFLUX_TOKEN=${INFLUX_TOKEN}     
+      - INFLUX_ORG=${INFLUX_ORG}
+      - INFLUX_BUCKET=${INFLUX_BUCKET}
+    restart: unless-stopped
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+  
+  frontend:
+    build:
+      context: ./app/frontend
+      dockerfile: Dockerfile
+      args:
+        - VITE_API_BASE_URL=/
+    container_name: wisenet-frontend
+    networks:
+      - wisenet-network
+    ports:
+      - "5173:80"
+    depends_on:
+      - api
+    restart: unless-stopped
+    environment:
+      - VITE_API_BASE_URL=/
+
+  influxdb:
+    image: influxdb:2.7
+    container_name: influxdb
+    networks:
+      - wisenet-network
+    ports:
+      - "8086:8086"
+    volumes:
+      - influxdb-data:/var/lib/influxdb2
+    environment:
+      - DOCKER_INFLUXDB_INIT_MODE=setup
+      - DOCKER_INFLUXDB_INIT_USERNAME=admin
+      - DOCKER_INFLUXDB_INIT_PASSWORD=admin12345
+      - DOCKER_INFLUXDB_INIT_ORG=${INFLUX_ORG}
+      - DOCKER_INFLUXDB_INIT_BUCKET=${INFLUX_BUCKET}
+      - DOCKER_INFLUXDB_INIT_ADMIN_TOKEN=${INFLUX_TOKEN}
+    healthcheck:
+      test: ["CMD", "influx", "ping", "--host", "http://localhost:8086"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    restart: unless-stopped
+
   mosquitto:
     image: eclipse-mosquitto:2
-    container_name: mosquitto_broker
-    restart: always
+    container_name: mosquitto
+    networks:
+      - wisenet-network 
     ports:
-      - "1883:1883"  # MQTT Port
+      - "1883:1883"
     volumes:
-      - ./mqtt/config:/mosquitto/config
-      - ./mqtt/data:/mosquitto/data
-      - ./mqtt/log:/mosquitto/log
+      - ./mosquitto:/mosquitto/config:ro
+    restart: unless-stopped
+  
+  grafana:
+    image: grafana/grafana:latest
+    container_name: grafana
+    ports:
+      - "4000:3000"
+    environment:
+      - GF_SECURITY_ALLOW_EMBEDDING=true
+      - GF_AUTH_ANONYMOUS_ENABLED=true
+      - GF_AUTH_ANONYMOUS_ORG_ROLE=Viewer
+      - GF_AUTH_ANONYMOUS_ORG_NAME=Main Org.
+    volumes:
+      - grafana-storage:/var/lib/grafana
+      - ./grafana/provisioning:/etc/grafana/provisioning:ro
+    depends_on:
+      - influxdb
+    restart: unless-stopped
+
+  simulators:
+    build:
+      context: .
+      dockerfile: ./Dockerfile
+    container_name: wisenet-simulators
+    networks:
+      - wisenet-network
+    volumes:
+      - ./:/app
+    depends_on:
+      - mosquitto
+    command: >
+      python scripts/run_simulators.py
+      --broker mosquitto
+      --port 1883
+      --devices dev-sensor-001,dev-sensor-002,dev-sensor-003
+    restart: unless-stopped
+
+networks:
+  wisenet-network:
+    driver: bridge 
+
+volumes:
+  influxdb-data:
+  grafana-storage:
